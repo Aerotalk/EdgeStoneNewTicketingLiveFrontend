@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    body {
+        @apply bg-gray-50 text-gray-900 antialiased;
+    }
+}
+
+@layer utilities {
+    .custom-scrollbar::-webkit-scrollbar {
+        height: 8px;
+        width: 8px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #e5e7eb;
+        border-radius: 20px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background-color: #d1d5db;
+    }
+
+    /* SLA table scrollbar — both H and V, always visible at the edges of the table viewport */
+    .sla-dynamic-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(229, 48, 59, 0.35) #f3f4f6;
+    }
+    .sla-dynamic-scrollbar::-webkit-scrollbar {
+        height: 8px;
+        width: 8px;
+    }
+    .sla-dynamic-scrollbar::-webkit-scrollbar-track {
+        background: #f3f4f6;
+        border-radius: 99px;
+    }
+    .sla-dynamic-scrollbar::-webkit-scrollbar-corner {
+        background: #f3f4f6;
+    }
+    .sla-dynamic-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(229, 48, 59, 0.35);
+        border-radius: 99px;
+        transition: background 0.2s;
+    }
+    .sla-dynamic-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(229, 48, 59, 0.6);
+    }
+}
