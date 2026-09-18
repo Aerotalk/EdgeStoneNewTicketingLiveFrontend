@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import AuthLayout from '../../layouts/AuthLayout'
 import { useAuth } from '../../contexts/AuthContext'
 import { authService } from '../../services/authService'
+import { API_BASE_URL } from '../../config'
 
 // Dummy Support Agents with Roles
 
@@ -39,7 +40,7 @@ export default function LoginPage() {
         setIsLoading(true)
 
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/login`, {
+            const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

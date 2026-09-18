@@ -18,6 +18,7 @@ import { toast } from 'react-hot-toast';
 import { signatureService, type Signature } from '../../services/signatureService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAvatar } from '../../hooks/useAvatar';
+import { API_BASE_URL } from '../../config';
 
 // ─── Signature Editor Toolbar ─────────────────────────────────────────────────
 const exec = (cmd: string, value?: string) => document.execCommand(cmd, false, value);
@@ -321,8 +322,7 @@ const SignaturesPage: React.FC = () => {
             // Upload to ImgBB for permanent hosting (Railway ephemeral disk workaround)
             const imgUrl = await handleImageUpload(file);
             
-            const rawApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-            const apiBase = rawApiBase.replace(/\/$/, '');
+            const apiBase = API_BASE_URL;
             const userStr = localStorage.getItem('edgestone_user');
             const user = userStr ? JSON.parse(userStr) : null;
             const token = user?.token || '';
@@ -359,8 +359,7 @@ const SignaturesPage: React.FC = () => {
         const fetchDetails = async () => {
             try {
                 // Fetch real-time profile via newly created backend /me route
-                const rawApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-                const apiBase = rawApiBase.replace(/\/$/, '');
+                const apiBase = API_BASE_URL;
                 
                 const meRes = await fetch(`${apiBase}/api/auth/me`, {
                     headers: { 'Authorization': `Bearer ${token}` }

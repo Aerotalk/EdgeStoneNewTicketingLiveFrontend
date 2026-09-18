@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../config';
+
 export interface EmailSuggestion {
     name: string;
     email: string;
@@ -6,7 +8,7 @@ export interface EmailSuggestion {
     count?: number;
 }
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL || ''}/api/email`;
+const API_URL = `${API_BASE_URL}/api/email`;
 
 const getAuthHeaders = () => {
     const userStr = localStorage.getItem('edgestone_user');

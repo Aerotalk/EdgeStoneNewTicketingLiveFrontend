@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../config';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Frontend Signature Service
 // Matches Outlook's per-agent signature management API
@@ -26,7 +28,7 @@ export interface UpdateSignatureData {
     defaultFor?: 'new' | 'reply' | 'both' | null;
 }
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/signatures`;
+const API_URL = `${API_BASE_URL}/api/signatures`;
 
 const getAuthHeaders = () => {
     const userStr = localStorage.getItem('edgestone_user');

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { TicketInfoSidebar } from './TicketInfoSidebar';
+import { API_BASE_URL } from '../../config';
 import { NotificationDropdown } from '../../components/ui/NotificationDropdown';
 import { DeleteConfirmModal } from '../../components/ui/DeleteConfirmModal';
 import { EmailRecipientAutocomplete } from '../../components/ui/EmailRecipientAutocomplete';
@@ -1386,7 +1387,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                                     const fileName = att.originalName || att.filename || att.name || 'Attachment';
                                                     const isLegacy = !att.url && att.contentBytes;
                                                     const isExceeded = !!att.exceededLimit || !!att.error;
-                                                    const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+                                                    const apiBase = API_BASE_URL;
 
                                                     let downloadUrl = '#';
                                                     if (att.filename) {

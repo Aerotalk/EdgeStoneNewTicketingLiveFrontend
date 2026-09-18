@@ -7,6 +7,7 @@ import { Calculator } from '../components/ui/Calculator';
 import { GlobalStickyNote } from '../components/ui/GlobalStickyNote';
 import { useAuth } from '../contexts/AuthContext';
 import { DashboardDataProvider } from '../contexts/DashboardDataContext';
+import { API_BASE_URL } from '../config';
 
 const DashboardLayout: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -22,7 +23,7 @@ const DashboardLayout: React.FC = () => {
 
     // Notifications Stream — with auto-reconnect & chime sound
     useEffect(() => {
-        const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+        const apiBase = API_BASE_URL;
         let eventSource: EventSource | null = null;
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
         let retryDelay = 3000;

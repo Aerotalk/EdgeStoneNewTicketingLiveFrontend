@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../config';
+
 /**
  * SLA Rule Condition — stored as computable data for calculation.
  * 
@@ -42,7 +44,7 @@ export interface CreateSlaData {
     rules: SlaRule[];
 }
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/sla`;
+const API_URL = `${API_BASE_URL}/api/sla`;
 
 const getAuthHeaders = () => {
     const userStr = localStorage.getItem('edgestone_user');

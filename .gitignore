@@ -25,6 +25,7 @@ dist-ssr
 
 # Environment Variables
 .env
-.env.production
 .env.development
 .env.test
+!.env.production
+!.env.example

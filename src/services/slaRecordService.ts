@@ -1,4 +1,6 @@
-const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/sla-records`;
+import { API_BASE_URL } from '../config';
+
+const API_URL = `${API_BASE_URL}/api/sla-records`;
 
 const getAuthHeaders = () => {
     const userStr = localStorage.getItem('edgestone_user');

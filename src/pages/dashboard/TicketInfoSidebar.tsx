@@ -6,6 +6,7 @@ import { getAuthHeaders, API_URL_SLA } from '../../types/sla';
 import { toast } from 'react-hot-toast';
 import { clientService } from '../../services/clientService';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config';
 
 const SUPPORT_AGENTS = [
     { id: 'agent-1', name: 'Soumyajit' },
@@ -110,7 +111,7 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
         // Fetch activity logs from backend
         const fetchActivityLogs = async () => {
             try {
-                const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/tickets`;
+                const API_URL = `${API_BASE_URL}/api/tickets`;
 
                 // Get token
                 const userStr = localStorage.getItem('edgestone_user');
@@ -181,7 +182,7 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                 return;
             }
             try {
-                const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/circuits`;
+                const API_URL = `${API_BASE_URL}/api/circuits`;
                 const userStr = localStorage.getItem('edgestone_user');
                 const user = userStr ? JSON.parse(userStr) : null;
                 const token = user?.token || '';
@@ -375,7 +376,7 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
         const newValue = !isSlaActive;
         setIsSlaActive(newValue);
         try {
-            const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/tickets`;
+            const API_URL = `${API_BASE_URL}/api/tickets`;
             const userStr = localStorage.getItem('edgestone_user');
             const user = userStr ? JSON.parse(userStr) : null;
             const token = user?.token || '';
@@ -465,7 +466,7 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                                 onClick={async () => {
                                     try {
                                         const newStatus = !ticket.isMaintenance;
-                                        await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tickets/${ticket.id}`, {
+                                        await fetch(`${API_BASE_URL}/api/tickets/${ticket.id}`, {
                                             method: 'PUT',
                                             headers: {
                                                 'Content-Type': 'application/json',

@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../config';
+
 export interface Client {
     id: string;
     name: string;
@@ -18,7 +20,7 @@ export interface UpdateClientData {
     status?: 'Active' | 'In-Active';
 }
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/clients`;
+const API_URL = `${API_BASE_URL}/api/clients`;
 
 const getAuthHeaders = () => {
     const userStr = localStorage.getItem('edgestone_user');

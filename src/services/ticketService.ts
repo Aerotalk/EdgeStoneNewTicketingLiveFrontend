@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../config';
+
 export interface Reply {
     id: string;
     text: string;
@@ -38,7 +40,7 @@ export interface Ticket {
     // Add other fields as needed
 }
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/tickets`;
+const API_URL = `${API_BASE_URL}/api/tickets`;
 
 const getAuthHeaders = () => {
     const userStr = localStorage.getItem('edgestone_user');
@@ -117,7 +119,7 @@ export const ticketService = {
             'Authorization': `Bearer ${user?.token || ''}`
         };
 
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/upload/attachments`, {
+        const response = await fetch(`${API_BASE_URL}/api/upload/attachments`, {
             method: 'POST',
             headers,
             body: formData,

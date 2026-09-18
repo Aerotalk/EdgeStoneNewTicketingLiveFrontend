@@ -1,12 +1,12 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../config';
 
-// Assuming base API URL is available via environment or globally
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/api` : 'http://localhost:5000/api';
+const ROADMAP_API_URL = `${API_BASE_URL}/api`;
 
 export const getRoadmapData = async () => {
     try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`${API_BASE_URL}/roadmap`, {
+        const response = await axios.get(`${ROADMAP_API_URL}/roadmap`, {
             headers: {
                 Authorization: `Bearer ${token}`
             }

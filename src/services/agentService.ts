@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../config';
+
 export interface Agent {
     id: string;
     name: string;
@@ -27,7 +29,7 @@ export interface UpdateAgentData {
     role?: 'Super admin' | 'Manager' | 'Support crew';
 }
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/agents`;
+const API_URL = `${API_BASE_URL}/api/agents`;
 
 const getAuthHeaders = () => {
     const userStr = localStorage.getItem('edgestone_user');

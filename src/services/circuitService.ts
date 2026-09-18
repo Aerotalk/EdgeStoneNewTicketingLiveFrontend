@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../config';
+
 /** Circuit entity returned by GET /api/circuits */
 export interface Circuit {
     id: string;
@@ -66,7 +68,7 @@ export interface CreateCircuitData {
 
 export type UpdateCircuitData = Partial<CreateCircuitData>;
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/circuits`;
+const API_URL = `${API_BASE_URL}/api/circuits`;
 
 const getAuthHeaders = () => {
     const userStr = localStorage.getItem('edgestone_user');

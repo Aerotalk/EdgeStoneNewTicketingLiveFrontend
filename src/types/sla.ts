@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../config';
+
 export interface SLARecord {
     id: string;
     ticketId: string;
@@ -20,4 +22,4 @@ export const getAuthHeaders = () => {
     };
 };
 
-export const API_URL_SLA = `${import.meta.env.VITE_API_BASE_URL}/api/sla-records`;
+export const API_URL_SLA = `${API_BASE_URL}/api/sla-records`;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, X, Save, Edit3, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { API_BASE_URL } from '../../config';
 
 interface GlobalStickyNoteProps {
     isOpen?: boolean;
@@ -39,7 +40,7 @@ export const GlobalStickyNote: React.FC<GlobalStickyNoteProps> = ({
     const fetchNote = async () => {
         setIsLoading(true);
         try {
-            const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/global-note`;
+            const API_URL = `${API_BASE_URL}/api/global-note`;
             const userStr = localStorage.getItem('edgestone_user');
             const user = userStr ? JSON.parse(userStr) : null;
             const token = user?.token || '';
@@ -64,7 +65,7 @@ export const GlobalStickyNote: React.FC<GlobalStickyNoteProps> = ({
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/global-note`;
+            const API_URL = `${API_BASE_URL}/api/global-note`;
             const userStr = localStorage.getItem('edgestone_user');
             const user = userStr ? JSON.parse(userStr) : null;
             const token = user?.token || '';

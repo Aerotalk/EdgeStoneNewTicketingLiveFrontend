@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../config';
+
 export interface Notification {
     id: string;
     title: string | null;
@@ -9,7 +11,6 @@ export interface Notification {
     updatedAt: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 export const notificationService = {
     getNotifications: async (): Promise<Notification[]> => {

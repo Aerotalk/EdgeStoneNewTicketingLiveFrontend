@@ -11,6 +11,10 @@ RUN npm ci
 # Copy the rest of the application code
 COPY . .
 
+# Define build arguments and environment variables for Vite
+ARG VITE_API_BASE_URL=https://monkfish-app-663au.ondigitalocean.app
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 # Build the Vite application
 RUN npm run build
 
