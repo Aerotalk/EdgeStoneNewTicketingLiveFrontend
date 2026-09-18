@@ -33,6 +33,7 @@ interface TicketInfoSidebarProps {
         isSlaActive?: boolean;
         isMaintenance?: boolean;
         circuitId?: string | null;
+        ticketType?: string;
     };
     priority?: string;
     circuit?: string;
@@ -69,6 +70,7 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
     const [slaStatus, setSlaStatus] = useState('Safe');
     const [slaStartDate, setSlaStartDate] = useState('');
     const [slaStartTime, setSlaStartTime] = useState('');
+    const [slaTimeZone, setSlaTimeZone] = useState('UTC');
     const isVendorTicket = Boolean(ticket.ticketId?.startsWith('#V') || ticket.ticketType === 'Vendor');
     const [isSlaActive, setIsSlaActive] = useState(isVendorTicket ? false : (ticket.isSlaActive !== undefined ? ticket.isSlaActive : true));
 
