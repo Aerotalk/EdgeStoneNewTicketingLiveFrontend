@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Clock, Building2, User, Users } from 'lucide-react';
+import { X, Clock, Building2, User, Users, Plus } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { emailSuggestionService, type EmailSuggestion } from '../../services/emailSuggestionService';
 
 interface EmailRecipientAutocompleteProps {
@@ -107,13 +108,29 @@ export const EmailRecipientAutocomplete: React.FC<EmailRecipientAutocompleteProp
         inputRef.current?.focus();
     };
 
-    const handleCommitRawInput = () => {
+    const handleCommitRawInput = (showToast = false) => {
         const email = inputValue.trim().replace(/[,;]$/, '');
-        if (isValidEmail(email) && !recipients.includes(email)) {
-            onAddRecipient(email);
+        if (!email) return;
+
+        if (!isValidEmail(email)) {
+            if (showToast) {
+                toast.error('Please enter a valid email address (e.g. name@domain.com)');
+            }
+            return;
+        }
+
+        if (recipients.some(r => r.toLowerCase() === email.toLowerCase())) {
+            if (showToast) {
+                toast.error('This email is already added');
+            }
             setInputValue('');
             setIsOpen(false);
+            return;
         }
+
+        onAddRecipient(email);
+        setInputValue('');
+        setIsOpen(false);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -135,7 +152,7 @@ export const EmailRecipientAutocomplete: React.FC<EmailRecipientAutocompleteProp
                 handleSelectSuggestion(suggestions[highlightedIndex]);
             } else if (inputValue.trim()) {
                 e.preventDefault();
-                handleCommitRawInput();
+                handleCommitRawInput(true);
             }
         } else if (e.key === 'Backspace' && !inputValue && recipients.length > 0) {
             onRemoveRecipient(recipients.length - 1);
@@ -225,11 +242,35 @@ export const EmailRecipientAutocomplete: React.FC<EmailRecipientAutocompleteProp
                         onBlur={() => {
                             // Delay slightly so click on dropdown item takes effect before commit
                             setTimeout(() => {
-                                handleCommitRawInput();
+                                handleCommitRawInput(false);
                             }, 180);
                         }}
                         className="flex-1 min-w-[130px] bg-transparent border-none focus:ring-0 text-[14px] font-bold text-gray-900 placeholder:text-gray-300 py-1 outline-none"
                     />
+
+                    {inputValue.trim().length > 0 && (
+                        <button
+                            type="button"
+                            onMouseDown={(e) => {
+                                // Prevent input blur so commit is handled cleanly on click
+                                e.preventDefault();
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleCommitRawInput(true);
+                                inputRef.current?.focus();
+                            }}
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-bold transition-all shadow-sm flex-shrink-0 animate-in fade-in zoom-in-95 duration-150 ${
+                                isValidEmail(inputValue.trim().replace(/[,;]$/, ''))
+                                    ? 'bg-orange-500 hover:bg-orange-600 text-white cursor-pointer active:scale-95 shadow-orange-500/20'
+                                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300 cursor-pointer'
+                            }`}
+                            title="Add email address"
+                        >
+                            <Plus size={13} strokeWidth={2.5} />
+                            <span>Add</span>
+                        </button>
+                    )}
                 </div>
 
                 {rightElement && (
@@ -240,7 +281,7 @@ export const EmailRecipientAutocomplete: React.FC<EmailRecipientAutocompleteProp
             </div>
 
             {/* Outlook-Style Suggestions Dropdown */}
-            {isOpen && suggestions.length > 0 && (
+            {isOpen && (suggestions.length > 0 || (inputValue.trim() && isValidEmail(inputValue.trim().replace(/[,;]$/, '')))) && (
                 <div className="absolute top-full left-0 right-0 mt-1.5 z-[300] bg-white rounded-2xl shadow-[0_16px_48px_rgba(15,23,42,0.18)] border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                     <div className="px-3.5 py-2 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
                         <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
@@ -292,6 +333,32 @@ export const EmailRecipientAutocomplete: React.FC<EmailRecipientAutocompleteProp
                                 </div>
                             );
                         })}
+
+                        {/* Direct commit option if user typed a valid email not already in suggestions */}
+                        {isValidEmail(inputValue.trim().replace(/[,;]$/, '')) && !suggestions.some(s => s.email.toLowerCase() === inputValue.trim().replace(/[,;]$/, '').toLowerCase()) && (
+                            <div
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => handleCommitRawInput(true)}
+                                className="px-3.5 py-2.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-orange-50/80 transition-colors text-orange-950"
+                            >
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-[12px] font-black flex-shrink-0 shadow-sm">
+                                        <Plus size={16} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-[13.5px] font-bold text-gray-900 truncate">
+                                            Add "{inputValue.trim().replace(/[,;]$/, '')}"
+                                        </div>
+                                        <div className="text-[12px] text-gray-500">
+                                            Click or press Enter to add this address
+                                        </div>
+                                    </div>
+                                </div>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-orange-100 text-orange-700">
+                                    Add Email
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

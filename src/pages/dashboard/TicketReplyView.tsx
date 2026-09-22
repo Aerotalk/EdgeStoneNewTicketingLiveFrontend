@@ -14,6 +14,7 @@ import {
     Eye,
     Paperclip,
     Plus,
+    Minus,
     Loader2,
     PenLine,
     RefreshCw,
@@ -595,7 +596,10 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 bcc: targetBcc.filter(e => !toLowerSet.has(e.toLowerCase().trim()) && !cleanCc.some(c => c.toLowerCase().trim() === e.toLowerCase().trim()))
             };
         });
-        setShowCc(targetCc.length > 0 || targetBcc.length > 0);
+        // Auto-expand CC/BCC if pre-existing recipients exist, but never auto-collapse once opened
+        if (targetCc.length > 0 || targetBcc.length > 0) {
+            setShowCc(true);
+        }
     }, [activeTab, ticket.email, ticket.header, ticket.id, confirmedCircuit, ticket.circuitId, ticket.cc, replies, tabRecipients, ticketCircuit]);
 
     // Ensure subject line is locked and populated when opening the email modal
@@ -1693,10 +1697,15 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                         <button
                                             type="button"
                                             onClick={() => setShowCc(!showCc)}
-                                            className={`p-1 rounded-md transition-all flex-shrink-0 ${showCc ? 'bg-orange-100 text-orange-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                                            title="Add Cc/Bcc"
+                                            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 flex-shrink-0 text-[12px] font-bold ${
+                                                showCc
+                                                    ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                                                    : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                                            }`}
+                                            title={showCc ? "Hide Cc/Bcc" : "Add Cc/Bcc"}
                                         >
-                                            <Plus size={16} />
+                                            {showCc ? <Minus size={14} /> : <Plus size={14} />}
+                                            <span>Cc/Bcc</span>
                                         </button>
                                     }
                                 />
