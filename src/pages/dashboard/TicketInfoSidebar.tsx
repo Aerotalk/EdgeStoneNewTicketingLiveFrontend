@@ -247,17 +247,35 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
     };
 
     const handleManualUpdate = async (payload: any) => {
-        if (!slaId) {
-            toast.error('No active SLA to update');
-            return false;
-        }
+        const targetId = slaId || ticket.id;
         try {
-            const response = await fetch(`${API_URL_SLA}/${slaId}/manual-update`, {
+            const targetType = activeTab?.startsWith('vendor') ? 'VENDOR' : 'CLIENT';
+            const response = await fetch(`${API_URL_SLA}/${targetId}/manual-update`, {
                 method: 'PUT',
                 headers: getAuthHeaders(),
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    ticketId: ticket.id,
+                    type: targetType,
+                    timeZone: slaTimeZone,
+                    ...payload
+                })
             });
             if (!response.ok) throw new Error('API failed');
+            const resData = await response.json();
+            if (resData.success && resData.data) {
+                const rec = resData.data;
+                setSlaId(rec.id);
+                setSlaStartDate(rec.startDate || '');
+                setSlaStartTime(rec.startTime || '');
+                setSlaCloseDate(rec.closeDate || '');
+                setSlaCloseTime(rec.closedTime || '');
+                setSlaCompensation(rec.compensation || '-');
+                setSlaStatus(rec.status || 'Safe');
+                if (rec.timeZone) {
+                    setSlaTimeZone(rec.timeZone);
+                    if (onTimeZoneChangeActive) onTimeZoneChangeActive(rec.timeZone);
+                }
+            }
             return true;
         } catch (error) {
             console.error('Failed to manually update SLA', error);
