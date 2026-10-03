@@ -87,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ agentName, isMobileOpen, onClo
                     <img
                         src="/assets/logo.png"
                         alt="EdgeStone"
-                        className={`h-14 w-auto transition-transform duration-300 ${isCollapsed ? 'scale-75' : 'scale-100'}`}
+                        className={`h-[70px] w-auto transition-transform duration-300 ${isCollapsed ? 'scale-75' : 'scale-100'}`}
                     />
                 </div>
 

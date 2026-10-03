@@ -111,7 +111,7 @@ export default function LoginPage() {
                     <img
                         src="/assets/logo.png"
                         alt="EdgeStone Logo"
-                        className="h-16 w-auto"
+                        className="h-20 w-auto"
                     />
                 </div>
 
