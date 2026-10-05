@@ -305,17 +305,37 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         return localStorage.getItem(`confirmed_circuit_id_${ticket.id}`) || ticket.circuitId || '';
     });
 
-    // Dedicated memoized vendor emails for the current active tab
+    // Dedicated memoized vendor emails for the current active tab (strictly excluding client email)
     const currentVendorEmails = useMemo(() => {
         if (!activeTab.startsWith('vendor')) return [];
+        const clientEmailLower = ticket.email?.toLowerCase();
         if (vendorEmailsByTab[activeTab] && vendorEmailsByTab[activeTab].length > 0) {
-            return vendorEmailsByTab[activeTab];
+            return vendorEmailsByTab[activeTab].filter(e => e.toLowerCase() !== clientEmailLower);
         }
         if (tabRecipients[activeTab]?.to && tabRecipients[activeTab].to.length > 0) {
-            return tabRecipients[activeTab].to;
+            return tabRecipients[activeTab].to.filter(e => e.toLowerCase() !== clientEmailLower);
         }
         return [];
-    }, [activeTab, vendorEmailsByTab, tabRecipients]);
+    }, [activeTab, vendorEmailsByTab, tabRecipients, ticket.email]);
+
+    // Guaranteed safe display vendor email for thread card
+    const displayVendorEmail = useMemo(() => {
+        if (currentVendorEmails.length > 0) return currentVendorEmails[0];
+        const clientEmailLower = ticket.email?.toLowerCase();
+        const nonClientEmail = emailForm.to.find(e => e.toLowerCase() !== clientEmailLower);
+        return (activeTab.startsWith('vendor') && nonClientEmail) ? nonClientEmail : 'vendor@example.com';
+    }, [currentVendorEmails, emailForm.to, activeTab, ticket.email]);
+
+    // Guaranteed safe vendor emails for sidebar profile
+    const sidebarVendorEmail = useMemo(() => {
+        if (currentVendorEmails.length > 0) return currentVendorEmails.join(', ');
+        if (activeTab.startsWith('vendor')) {
+            const clientEmailLower = ticket.email?.toLowerCase();
+            const nonClientEmails = emailForm.to.filter(e => e.toLowerCase() !== clientEmailLower);
+            return nonClientEmails.join(', ');
+        }
+        return '';
+    }, [currentVendorEmails, emailForm.to, activeTab, ticket.email]);
 
     // Centralized instant tab switcher that synchronizes email recipients synchronously
     const switchTab = useCallback((newTab: string) => {
@@ -336,32 +356,49 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         let targetCc: string[] = [];
         let targetBcc: string[] = [];
 
-        if (tabRecipients[newTab]?.to !== undefined) {
-            targetTo = tabRecipients[newTab].to;
-            targetCc = tabRecipients[newTab].cc || [];
-            targetBcc = tabRecipients[newTab].bcc || [];
-        } else if (newTab === 'client') {
-            targetTo = ticket.email ? [ticket.email] : [];
-            const clientCcs = new Set<string>();
-            const storedClientCc = localStorage.getItem(`ticket_client_cc_${ticket.id}`);
-            if (storedClientCc) {
-                try {
-                    const parsed = JSON.parse(storedClientCc);
-                    if (Array.isArray(parsed)) parsed.forEach(e => e && clientCcs.add(e.toLowerCase().trim()));
-                } catch (_) {}
+        if (newTab === 'client') {
+            const allVendorEmails = new Set(Object.values(vendorEmailsByTab).flat().map(e => e.toLowerCase()));
+            if (tabRecipients['client']?.to && tabRecipients['client'].to.length > 0) {
+                targetTo = tabRecipients['client'].to.filter(e => !allVendorEmails.has(e.toLowerCase()));
             }
-            if (ticket.cc && Array.isArray(ticket.cc)) {
-                ticket.cc.forEach(e => e && clientCcs.add(e.toLowerCase().trim()));
+            if (targetTo.length === 0) {
+                targetTo = ticket.email ? [ticket.email] : [];
             }
-            targetCc = Array.from(clientCcs);
+            targetCc = tabRecipients['client']?.cc || [];
+            targetBcc = tabRecipients['client']?.bcc || [];
+            if (targetCc.length === 0) {
+                const clientCcs = new Set<string>();
+                const storedClientCc = localStorage.getItem(`ticket_client_cc_${ticket.id}`);
+                if (storedClientCc) {
+                    try {
+                        const parsed = JSON.parse(storedClientCc);
+                        if (Array.isArray(parsed)) parsed.forEach(e => e && clientCcs.add(e.toLowerCase().trim()));
+                    } catch (_) {}
+                }
+                if (ticket.cc && Array.isArray(ticket.cc)) {
+                    ticket.cc.forEach(e => e && clientCcs.add(e.toLowerCase().trim()));
+                }
+                targetCc = Array.from(clientCcs);
+            }
         } else if (newTab.startsWith('vendor')) {
-            targetTo = vendorEmailsByTab[newTab] || [];
-            const storedVendorCc = localStorage.getItem(`ticket_vendor_cc_${ticket.id}_${newTab}`);
-            if (storedVendorCc) {
-                try {
-                    const parsed = JSON.parse(storedVendorCc);
-                    if (Array.isArray(parsed)) targetCc = parsed.filter(Boolean);
-                } catch (_) {}
+            const clientEmailLower = ticket.email?.toLowerCase();
+            if (tabRecipients[newTab]?.to && tabRecipients[newTab].to.length > 0) {
+                targetTo = tabRecipients[newTab].to.filter(e => e.toLowerCase() !== clientEmailLower);
+            } else if (vendorEmailsByTab[newTab]?.length) {
+                targetTo = vendorEmailsByTab[newTab].filter(e => e.toLowerCase() !== clientEmailLower);
+            } else {
+                targetTo = [];
+            }
+            targetCc = tabRecipients[newTab]?.cc || [];
+            targetBcc = tabRecipients[newTab]?.bcc || [];
+            if (targetCc.length === 0) {
+                const storedVendorCc = localStorage.getItem(`ticket_vendor_cc_${ticket.id}_${newTab}`);
+                if (storedVendorCc) {
+                    try {
+                        const parsed = JSON.parse(storedVendorCc);
+                        if (Array.isArray(parsed)) targetCc = parsed.filter(Boolean);
+                    } catch (_) {}
+                }
             }
         }
 
@@ -1401,7 +1438,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                         <div className="space-y-0.5">
                                             <div className="flex items-center gap-1.5">
                                                 <span className="text-[15px] font-bold text-gray-900">{vendorName || 'EdgeStone Vendor'}</span>
-                                                <span className="text-[14px] text-gray-400 font-medium">&lt;{currentVendorEmails.length > 0 ? currentVendorEmails[0] : (activeTab.startsWith('vendor') && emailForm.to.length > 0 ? emailForm.to[0] : 'vendor@example.com')}&gt;</span>
+                                                <span className="text-[14px] text-gray-400 font-medium">&lt;{displayVendorEmail}&gt;</span>
                                             </div>
                                             <p className="text-[13px] text-gray-400 font-medium">To: support@edgestone.in</p>
                                         </div>
@@ -1672,7 +1709,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                     status={ticketStatus}
                     closedAt={closedAt}
                     activeTab={activeTab}
-                    vendorEmail={currentVendorEmails.length > 0 ? currentVendorEmails.join(', ') : (activeTab.startsWith('vendor') && emailForm.to.length > 0 ? emailForm.to.join(', ') : '')}
+                    vendorEmail={sidebarVendorEmail}
                     vendorName={vendorName}
                     onTimeZoneChangeActive={(zone) => setGlobalTimeZone(zone)}
                 />
