@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useTransition } from 'react';
+import React, { useState, useEffect, useRef, useTransition, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import {
@@ -66,12 +66,6 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
     const [ticketCircuit, setTicketCircuit] = useState<any>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    useEffect(() => {
-        const tab = searchParams.get('tab');
-        if (tab === 'vendor' || tab?.startsWith('vendor_') || tab === 'client') {
-            setActiveTab(tab);
-        }
-    }, [searchParams]);
 
     const handleRefresh = async () => {
         try {
@@ -278,32 +272,124 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
     // Email Modal form states
     const [emailForm, setEmailForm] = useState({
         from: 'support@edgestone.in',
-        to: [] as string[],
+        to: (tabParam === 'vendor' || tabParam?.startsWith('vendor_') || ticket.ticketType === 'Vendor')
+            ? []
+            : (ticket.email ? [ticket.email] : []),
         cc: [] as string[],
         bcc: [] as string[],
         subject: ''
     });
 
-    // Track recipients (CC & BCC) per tab to completely isolate Client tab from Vendor tab
-    const [tabRecipients, setTabRecipients] = useState<Record<string, { cc: string[], bcc: string[] }>>({});
+    // Track recipients (TO, CC & BCC) per tab to completely isolate Client tab from Vendor tab
+    const [tabRecipients, setTabRecipients] = useState<Record<string, { to: string[], cc: string[], bcc: string[] }>>({});
+    const [vendorEmailsByTab, setVendorEmailsByTab] = useState<Record<string, string[]>>({});
 
     // Reset emailForm whenever the ticket changes so stale data from a previous ticket don't bleed in
     useEffect(() => {
         setTabRecipients({});
+        setVendorEmailsByTab({});
         setEmailForm({
             from: 'support@edgestone.in',
-            to: [],
+            to: (activeTab === 'vendor' || activeTab.startsWith('vendor_') || ticket.ticketType === 'Vendor')
+                ? []
+                : (ticket.email ? [ticket.email] : []),
             cc: [],
             bcc: [],
             subject: getLockedSubject(activeTab)
         });
         setShowCc(false);
-    }, [ticket.id, activeTab]);
+    }, [ticket.id]);
 
 
     const [confirmedCircuit, setConfirmedCircuit] = useState(() => {
         return localStorage.getItem(`confirmed_circuit_id_${ticket.id}`) || ticket.circuitId || '';
     });
+
+    // Dedicated memoized vendor emails for the current active tab
+    const currentVendorEmails = useMemo(() => {
+        if (!activeTab.startsWith('vendor')) return [];
+        if (vendorEmailsByTab[activeTab] && vendorEmailsByTab[activeTab].length > 0) {
+            return vendorEmailsByTab[activeTab];
+        }
+        if (tabRecipients[activeTab]?.to && tabRecipients[activeTab].to.length > 0) {
+            return tabRecipients[activeTab].to;
+        }
+        return [];
+    }, [activeTab, vendorEmailsByTab, tabRecipients]);
+
+    // Centralized instant tab switcher that synchronizes email recipients synchronously
+    const switchTab = useCallback((newTab: string) => {
+        if (newTab === activeTab) return;
+
+        // 1. Snapshot the current tab's active recipients before switching
+        setTabRecipients(prev => ({
+            ...prev,
+            [activeTab]: {
+                to: emailForm.to,
+                cc: emailForm.cc,
+                bcc: emailForm.bcc
+            }
+        }));
+
+        // 2. Determine target recipients for the new tab immediately
+        let targetTo: string[] = [];
+        let targetCc: string[] = [];
+        let targetBcc: string[] = [];
+
+        if (tabRecipients[newTab]?.to !== undefined) {
+            targetTo = tabRecipients[newTab].to;
+            targetCc = tabRecipients[newTab].cc || [];
+            targetBcc = tabRecipients[newTab].bcc || [];
+        } else if (newTab === 'client') {
+            targetTo = ticket.email ? [ticket.email] : [];
+            const clientCcs = new Set<string>();
+            const storedClientCc = localStorage.getItem(`ticket_client_cc_${ticket.id}`);
+            if (storedClientCc) {
+                try {
+                    const parsed = JSON.parse(storedClientCc);
+                    if (Array.isArray(parsed)) parsed.forEach(e => e && clientCcs.add(e.toLowerCase().trim()));
+                } catch (_) {}
+            }
+            if (ticket.cc && Array.isArray(ticket.cc)) {
+                ticket.cc.forEach(e => e && clientCcs.add(e.toLowerCase().trim()));
+            }
+            targetCc = Array.from(clientCcs);
+        } else if (newTab.startsWith('vendor')) {
+            targetTo = vendorEmailsByTab[newTab] || [];
+            const storedVendorCc = localStorage.getItem(`ticket_vendor_cc_${ticket.id}_${newTab}`);
+            if (storedVendorCc) {
+                try {
+                    const parsed = JSON.parse(storedVendorCc);
+                    if (Array.isArray(parsed)) targetCc = parsed.filter(Boolean);
+                } catch (_) {}
+            }
+        }
+
+        // 3. Immediately set emailForm so there is ZERO persistence of the previous tab's email
+        setEmailForm({
+            from: 'support@edgestone.in',
+            to: targetTo,
+            cc: targetCc,
+            bcc: targetBcc,
+            subject: getLockedSubject(newTab)
+        });
+
+        if (targetCc.length > 0 || targetBcc.length > 0) {
+            setShowCc(true);
+        }
+
+        // 4. Update the activeTab state
+        startTransition(() => {
+            setActiveTab(newTab);
+        });
+    }, [activeTab, emailForm.to, emailForm.cc, emailForm.bcc, tabRecipients, ticket, vendorEmailsByTab]);
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && tab !== activeTab && (tab === 'vendor' || tab.startsWith('vendor_') || tab === 'client')) {
+            switchTab(tab);
+        }
+    }, [searchParams, activeTab, switchTab]);
 
     useEffect(() => {
         circuitService.getAllCircuits().then(circuits => {
@@ -317,7 +403,9 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 setTicketCircuit(matchedCircuit);
                 const firstVc = matchedCircuit.vendorCircuits?.[0];
                 if (matchedCircuit.isMultiVendor && firstVc?.vendorId) {
-                    setActiveTab(prev => (prev === 'vendor' ? `vendor_${firstVc.vendorId}` : prev));
+                    if (activeTab === 'vendor') {
+                        switchTab(`vendor_${firstVc.vendorId}`);
+                    }
                 }
             }
         }).catch(console.error);
@@ -364,9 +452,13 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
     }, [ticketStatus]);
 
     useEffect(() => {
+        let isCancelled = false;
+        const currentTab = activeTab;
+
         // Update toEmail when tab or ticket changes
         if (activeTab === 'client') {
             circuitService.getAllCircuits().then(circuits => {
+                if (isCancelled) return;
                 const matchedCircuit = circuits.find(c =>
                     (confirmedCircuit && c.customerCircuitId === confirmedCircuit) ||
                     c.customerCircuitId === ticket.header ||
@@ -376,38 +468,40 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
 
                 if (matchedCircuit && matchedCircuit.clientId) {
                     clientService.getAllClients().then(clients => {
+                        if (isCancelled) return;
                         const found = clients.find(c => c.id === matchedCircuit.clientId);
-                        if (found && found.emails && found.emails.length > 0) {
-                            setEmailForm(prev => ({
+                        const clientTo = (found && found.emails && found.emails.length > 0)
+                            ? [found.emails[0]]
+                            : (ticket.email ? [ticket.email] : []);
+
+                        setTabRecipients(prev => ({
+                            ...prev,
+                            client: {
+                                to: clientTo,
+                                cc: prev.client?.cc || [],
+                                bcc: prev.client?.bcc || []
+                            }
+                        }));
+
+                        setEmailForm(prev => {
+                            if (activeTab !== 'client') return prev;
+                            return {
                                 ...prev,
-                                to: [found.emails[0]],
+                                to: clientTo,
                                 subject: `Re: [${ticket.ticketId}] ${ticket.header}`
-                            }));
-                        } else {
-                            setEmailForm(prev => ({
-                                ...prev,
-                                to: [ticket.email],
-                                subject: `Re: [${ticket.ticketId}] ${ticket.header}`
-                            }));
-                        }
+                            };
+                        });
                     }).catch(() => {
-                        setEmailForm(prev => ({ ...prev, to: [ticket.email], subject: `Re: [${ticket.ticketId}] ${ticket.header}` }));
+                        if (isCancelled) return;
+                        setEmailForm(prev => (activeTab === 'client' ? { ...prev, to: [ticket.email], subject: `Re: [${ticket.ticketId}] ${ticket.header}` } : prev));
                     });
                 } else {
-                    setEmailForm(prev => ({
-                        ...prev,
-                        to: [ticket.email],
-                        subject: `Re: [${ticket.ticketId}] ${ticket.header}`
-                    }));
+                    setEmailForm(prev => (activeTab === 'client' ? { ...prev, to: [ticket.email], subject: `Re: [${ticket.ticketId}] ${ticket.header}` } : prev));
                 }
             }).catch(() => {
-                setEmailForm(prev => ({
-                    ...prev,
-                    to: [ticket.email],
-                    subject: `Re: [${ticket.ticketId}] ${ticket.header}`
-                }));
+                if (isCancelled) return;
+                setEmailForm(prev => (activeTab === 'client' ? { ...prev, to: [ticket.email], subject: `Re: [${ticket.ticketId}] ${ticket.header}` } : prev));
             });
-
 
         } else if (activeTab.startsWith('vendor')) {
             const isSpecificVendor = activeTab.startsWith('vendor_');
@@ -415,16 +509,37 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
 
             // Fetch dynamically on vendor tab click - pass specific vendorId if multi-vendor
             ticketService.getVendorEmails(ticket.id, specificVendorId).then(emails => {
+                if (isCancelled) return;
                 const lockedSub = getLockedSubject(activeTab);
 
-                setEmailForm(prev => ({
+                if (emails && emails.length > 0) {
+                    setVendorEmailsByTab(prev => ({
+                        ...prev,
+                        [currentTab]: emails
+                    }));
+                }
+
+                setTabRecipients(prev => ({
                     ...prev,
-                    to: emails,
-                    subject: lockedSub
+                    [currentTab]: {
+                        to: emails,
+                        cc: prev[currentTab]?.cc || [],
+                        bcc: prev[currentTab]?.bcc || []
+                    }
                 }));
+
+                setEmailForm(prev => {
+                    if (activeTab !== currentTab) return prev;
+                    return {
+                        ...prev,
+                        to: emails,
+                        subject: lockedSub
+                    };
+                });
 
                 // Fetch the vendor name associated specifically with the connected circuit
                 circuitService.getAllCircuits().then(circuits => {
+                    if (isCancelled) return;
                     const matchedCircuit = circuits.find(c =>
                         (confirmedCircuit && c.customerCircuitId === confirmedCircuit) ||
                         c.customerCircuitId === ticket.header ||
@@ -447,9 +562,22 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                         if (targetVendor) {
                             setVendorName(targetVendor.name);
                             vendorService.getAllVendors().then(vendors => {
+                                if (isCancelled) return;
                                 const fullVendor = vendors.find(v => v.id === targetVendor?.id || v.name === targetVendor?.name);
                                 if (fullVendor && fullVendor.emails && fullVendor.emails.length > 0) {
-                                    setEmailForm(prev => ({ ...prev, to: fullVendor.emails }));
+                                    setVendorEmailsByTab(prev => ({
+                                        ...prev,
+                                        [currentTab]: fullVendor.emails
+                                    }));
+                                    setTabRecipients(prev => ({
+                                        ...prev,
+                                        [currentTab]: {
+                                            to: fullVendor.emails,
+                                            cc: prev[currentTab]?.cc || [],
+                                            bcc: prev[currentTab]?.bcc || []
+                                        }
+                                    }));
+                                    setEmailForm(prev => (activeTab === currentTab ? { ...prev, to: fullVendor.emails } : prev));
                                 }
                             }).catch(console.error);
                         } else {
@@ -459,14 +587,17 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                     } else {
                         setVendorName('EdgeStone Vendor');
                     }
-                }).catch(() => setVendorName('EdgeStone Vendor'));
+                }).catch(() => {
+                    if (!isCancelled) setVendorName('EdgeStone Vendor');
+                });
             }).catch(err => {
+                if (isCancelled) return;
                 console.error("Failed to fetch vendor emails", err);
-                setEmailForm(prev => ({
+                setEmailForm(prev => (activeTab === currentTab ? {
                     ...prev,
                     to: [],
                     subject: getLockedSubject(activeTab)
-                }));
+                } : prev));
                 setVendorName('EdgeStone Vendor');
             });
         }
@@ -475,7 +606,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         let targetCc: string[] = [];
         let targetBcc: string[] = [];
 
-        if (tabRecipients[activeTab]) {
+        if (tabRecipients[activeTab]?.cc?.length || tabRecipients[activeTab]?.bcc?.length) {
             targetCc = tabRecipients[activeTab].cc;
             targetBcc = tabRecipients[activeTab].bcc;
         } else if (activeTab === 'client') {
@@ -600,7 +731,11 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         if (targetCc.length > 0 || targetBcc.length > 0) {
             setShowCc(true);
         }
-    }, [activeTab, ticket.email, ticket.header, ticket.id, confirmedCircuit, ticket.circuitId, ticket.cc, replies, tabRecipients, ticketCircuit]);
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [activeTab, ticket.email, ticket.header, ticket.id, confirmedCircuit, ticket.circuitId, ticket.cc, replies, ticketCircuit]);
 
     // Ensure subject line is locked and populated when opening the email modal
     useEffect(() => {
@@ -945,6 +1080,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 setTabRecipients(tPrev => ({
                     ...tPrev,
                     [activeTab]: {
+                        to: nextTo,
                         cc: nextCc,
                         bcc: nextBcc
                     }
@@ -969,15 +1105,19 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
     const removeRecipient = (field: 'to' | 'cc' | 'bcc', index: number) => {
         setEmailForm(prev => {
             const nextField = prev[field].filter((_, i) => i !== index);
-            if (field === 'cc' || field === 'bcc') {
-                setTabRecipients(tPrev => ({
-                    ...tPrev,
-                    [activeTab]: {
-                        cc: field === 'cc' ? nextField : (tPrev[activeTab]?.cc ?? prev.cc),
-                        bcc: field === 'bcc' ? nextField : (tPrev[activeTab]?.bcc ?? prev.bcc)
-                    }
-                }));
-            }
+            const nextTo = field === 'to' ? nextField : prev.to;
+            const nextCc = field === 'cc' ? nextField : prev.cc;
+            const nextBcc = field === 'bcc' ? nextField : prev.bcc;
+
+            setTabRecipients(tPrev => ({
+                ...tPrev,
+                [activeTab]: {
+                    to: nextTo,
+                    cc: nextCc,
+                    bcc: nextBcc
+                }
+            }));
+
             if (field === 'cc') {
                 if (activeTab.startsWith('vendor')) {
                     localStorage.setItem(`ticket_vendor_cc_${ticket.id}_${activeTab}`, JSON.stringify(nextField));
@@ -1149,7 +1289,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
 
                         {ticket.ticketType !== 'Vendor' && (
                             <button
-                                onClick={() => startTransition(() => setActiveTab('client'))}
+                                onClick={() => switchTab('client')}
                                 className={`flex items-center gap-2 py-4 text-[14px] font-bold transition-all border-b-2 ${activeTab === 'client' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                             >
                                 <User size={18} />
@@ -1162,7 +1302,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                 return (
                                     <button
                                         key={vc.vendorId || idx}
-                                        onClick={() => startTransition(() => setActiveTab(`vendor_${vc.vendorId}`))}
+                                        onClick={() => switchTab(`vendor_${vc.vendorId}`)}
                                         className={`flex items-center gap-2 py-4 text-[14px] font-bold transition-all border-b-2 ${activeTab === `vendor_${vc.vendorId}` ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                                     >
                                         <User size={18} />
@@ -1177,7 +1317,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                             })
                         ) : (
                             <button
-                                onClick={() => startTransition(() => setActiveTab('vendor'))}
+                                onClick={() => switchTab('vendor')}
                                 className={`flex items-center gap-2 py-4 text-[14px] font-bold transition-all border-b-2 ${activeTab === 'vendor' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                             >
                                 <User size={18} />
@@ -1261,7 +1401,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                         <div className="space-y-0.5">
                                             <div className="flex items-center gap-1.5">
                                                 <span className="text-[15px] font-bold text-gray-900">{vendorName || 'EdgeStone Vendor'}</span>
-                                                <span className="text-[14px] text-gray-400 font-medium">&lt;{emailForm.to.length > 0 ? emailForm.to[0] : 'vendor@example.com'}&gt;</span>
+                                                <span className="text-[14px] text-gray-400 font-medium">&lt;{currentVendorEmails.length > 0 ? currentVendorEmails[0] : (activeTab.startsWith('vendor') && emailForm.to.length > 0 ? emailForm.to[0] : 'vendor@example.com')}&gt;</span>
                                             </div>
                                             <p className="text-[13px] text-gray-400 font-medium">To: support@edgestone.in</p>
                                         </div>
@@ -1532,7 +1672,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                     status={ticketStatus}
                     closedAt={closedAt}
                     activeTab={activeTab}
-                    vendorEmail={emailForm.to.length > 0 ? emailForm.to.join(', ') : ''}
+                    vendorEmail={currentVendorEmails.length > 0 ? currentVendorEmails.join(', ') : (activeTab.startsWith('vendor') && emailForm.to.length > 0 ? emailForm.to.join(', ') : '')}
                     vendorName={vendorName}
                     onTimeZoneChangeActive={(zone) => setGlobalTimeZone(zone)}
                 />
