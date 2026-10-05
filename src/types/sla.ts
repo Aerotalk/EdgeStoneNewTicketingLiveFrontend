@@ -1,5 +1,7 @@
 import { API_BASE_URL } from '../config';
 
+export type SLAStatus = 'Breached' | 'Safe' | 'No SLA' | 'BREACHED' | 'SAFE' | (string & {});
+
 export interface SLARecord {
     id: string;
     ticketId: string;
@@ -8,7 +10,7 @@ export interface SLARecord {
     startTime: string;
     closedTime: string;
     closeDate: string;
-    status: 'Breached' | 'Safe';
+    status: SLAStatus;
     compensation: string;
     statusReason?: string;
 }

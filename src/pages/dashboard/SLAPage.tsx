@@ -11,6 +11,7 @@ import {
     Filter,
     Info,
     X,
+    AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -199,8 +200,8 @@ const SLAPage: React.FC = () => {
 
 
     const handleSaveStatus = async () => {
-        if (!statusModal.reason.trim() || !statusModal.recordId || !statusModal.newStatus) {
-            toast.error("Please provide a reason.");
+        if (!statusModal.reason.trim() || statusModal.reason.trim().length < 10 || !statusModal.recordId || !statusModal.newStatus) {
+            toast.error("Please provide a detailed reason (minimum 10 characters).");
             return;
         }
 
@@ -263,7 +264,10 @@ const SLAPage: React.FC = () => {
             {/* SLA Rules Modal */}
             <SLARulesModal
                 isOpen={isSLARulesModalOpen}
-                onClose={() => setIsSLARulesModalOpen(false)}
+                onClose={() => {
+                    setIsSLARulesModalOpen(false);
+                    fetchRecords();
+                }}
             />
 
 
@@ -449,38 +453,69 @@ const SLAPage: React.FC = () => {
                                                 )}
                                             </td>
                                             <td className="px-6 py-5">
-                                                {record.status ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={`relative flex items-center gap-2 px-3.5 py-1.5 rounded-lg border shadow-sm text-[12px] font-extrabold transition-all ${
-                                                            (statusModal.isOpen && statusModal.recordId === record.id ? statusModal.newStatus || record.status : record.status) === 'Breached' 
-                                                                ? 'bg-red-50/80 text-red-600 border-red-100/80 group-hover:bg-red-50' 
-                                                                : 'bg-emerald-50/80 text-emerald-600 border-emerald-100/80 group-hover:bg-emerald-50'
-                                                        }`}>
-                                                            <span className={`w-1.5 h-1.5 rounded-full shadow-sm ${(statusModal.isOpen && statusModal.recordId === record.id ? statusModal.newStatus || record.status : record.status) === 'Breached' ? 'bg-red-500 shadow-red-500/50' : 'bg-emerald-500 shadow-emerald-500/50'}`} />
-                                                            <select
-                                                                value={statusModal.isOpen && statusModal.recordId === record.id ? statusModal.newStatus || record.status : record.status}
-                                                                onChange={(e) => {
-                                                                    setStatusModal({ isOpen: true, recordId: record.id, newStatus: e.target.value as 'Safe' | 'Breached', reason: '' });
-                                                                }}
-                                                                className="bg-transparent cursor-pointer outline-none border-none appearance-none font-extrabold pr-1 focus:ring-0"
-                                                            >
-                                                                <option value="Safe" className="text-emerald-600">Safe</option>
-                                                                <option value="Breached" className="text-red-600">Breached</option>
-                                                            </select>
-                                                        </div>
-                                                        {record.statusReason && (
-                                                            <div className="relative group/tooltip flex items-center justify-center cursor-help text-gray-300 hover:text-gray-500 transition-colors">
-                                                                <Info size={18} strokeWidth={2.5} />
-                                                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-56 p-3 bg-gray-900/95 backdrop-blur-md text-white text-xs font-medium rounded-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 shadow-xl z-50 pointer-events-none text-center transform scale-95 group-hover/tooltip:scale-100">
-                                                                    {record.statusReason}
-                                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900/95"></div>
+                                                {(() => {
+                                                    const isUnconfigured = record.status === 'No SLA' || record.statusReason?.toLowerCase().includes('no active');
+                                                    if (isUnconfigured) {
+                                                        return (
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setIsSLARulesModalOpen(true)}
+                                                                    title="Click to configure SLA rules for this circuit"
+                                                                    className="group/btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-200/90 bg-amber-50/90 hover:bg-amber-100/90 text-amber-700 text-[11px] font-extrabold shadow-sm transition-all active:scale-95"
+                                                                >
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50 group-hover/btn:scale-125 transition-transform" />
+                                                                    <span>No SLA Set</span>
+                                                                </button>
+                                                                <div className="relative group/tooltip flex items-center justify-center cursor-help text-amber-400 hover:text-amber-600 transition-colors">
+                                                                    <Info size={16} strokeWidth={2.5} />
+                                                                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-64 p-3 bg-gray-900/95 backdrop-blur-md text-white text-xs font-medium rounded-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 shadow-xl z-50 pointer-events-none text-center transform scale-95 group-hover/tooltip:scale-100">
+                                                                        No active SLA rules configured for this circuit yet. Click "No SLA Set" to define SLA tiers.
+                                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900/95"></div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-gray-300 font-medium">-</span>
-                                                )}
+                                                        );
+                                                    }
+
+                                                    if (!record.status) {
+                                                        return <span className="text-gray-300 font-medium">-</span>;
+                                                    }
+
+                                                    const currentStatus = statusModal.isOpen && statusModal.recordId === record.id ? statusModal.newStatus || record.status : record.status;
+                                                    const isBreached = currentStatus?.toUpperCase() === 'BREACHED';
+
+                                                    return (
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`relative flex items-center gap-2 px-3.5 py-1.5 rounded-lg border shadow-sm text-[12px] font-extrabold transition-all ${
+                                                                isBreached 
+                                                                    ? 'bg-red-50/80 text-red-600 border-red-100/80 group-hover:bg-red-50' 
+                                                                    : 'bg-emerald-50/80 text-emerald-600 border-emerald-100/80 group-hover:bg-emerald-50'
+                                                            }`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full shadow-sm ${isBreached ? 'bg-red-500 shadow-red-500/50' : 'bg-emerald-500 shadow-emerald-500/50'}`} />
+                                                                <select
+                                                                    value={isBreached ? 'Breached' : 'Safe'}
+                                                                    onChange={(e) => {
+                                                                        setStatusModal({ isOpen: true, recordId: record.id, newStatus: e.target.value as 'Safe' | 'Breached', reason: '' });
+                                                                    }}
+                                                                    className="bg-transparent cursor-pointer outline-none border-none appearance-none font-extrabold pr-1 focus:ring-0"
+                                                                >
+                                                                    <option value="Safe" className="text-emerald-600">Safe</option>
+                                                                    <option value="Breached" className="text-red-600">Breached</option>
+                                                                </select>
+                                                            </div>
+                                                            {record.statusReason && (
+                                                                <div className="relative group/tooltip flex items-center justify-center cursor-help text-gray-300 hover:text-gray-500 transition-colors">
+                                                                    <Info size={18} strokeWidth={2.5} />
+                                                                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-56 p-3 bg-gray-900/95 backdrop-blur-md text-white text-xs font-medium rounded-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 shadow-xl z-50 pointer-events-none text-center transform scale-95 group-hover/tooltip:scale-100">
+                                                                        {record.statusReason}
+                                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900/95"></div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-6 py-5 rounded-r-2xl text-right">
                                                 {record.compensation !== '-' && record.compensation ? (
@@ -536,6 +571,38 @@ const SLAPage: React.FC = () => {
                             </button>
                         </div>
                         <div className="p-6 text-sm flex flex-col gap-4">
+                            {/* Proactive Caution Banner */}
+                            {(() => {
+                                const currentRecord = records.find(r => r.id === statusModal.recordId);
+                                const isCurrentBreached = currentRecord?.status === 'Breached' || currentRecord?.status === 'BREACHED';
+                                const isWaivingBreach = isCurrentBreached && statusModal.newStatus === 'Safe';
+                                const isManualBreach = !isCurrentBreached && statusModal.newStatus === 'Breached';
+                                
+                                if (isWaivingBreach) {
+                                    return (
+                                        <div className="p-3.5 bg-amber-50 border border-amber-200/90 rounded-xl text-amber-800 text-xs flex items-start gap-2.5">
+                                            <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                                            <div>
+                                                <strong className="font-bold text-amber-900 block mb-0.5">⚠️ Caution: Waiving SLA Breach</strong>
+                                                <span>Changing status to <strong>Safe</strong> will cancel the breach penalty and reset compensation from <strong>{currentRecord?.compensation}</strong> to <strong>"-"</strong> (waived). Ensure this override is formally authorized.</span>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                if (isManualBreach) {
+                                    return (
+                                        <div className="p-3.5 bg-red-50 border border-red-200/90 rounded-xl text-red-800 text-xs flex items-start gap-2.5">
+                                            <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                                            <div>
+                                                <strong className="font-bold text-red-900 block mb-0.5">⚠️ Manual Breach Override</strong>
+                                                <span>You are manually declaring an SLA breach. A clear and detailed justification is required for the audit log.</span>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
                             <p className="text-gray-600">
                                 You are changing the status to <span className={`font-bold px-2 py-0.5 rounded text-[12px] ` + (statusModal.newStatus === 'Breached' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600')}>{statusModal.newStatus}</span>. Please provide a reason for this change.
                             </p>
@@ -543,9 +610,14 @@ const SLAPage: React.FC = () => {
                                 autoFocus
                                 value={statusModal.reason}
                                 onChange={(e) => setStatusModal(prev => ({ ...prev, reason: e.target.value }))}
-                                placeholder="Enter reason for this change..."
-                                className="w-full h-32 p-3 border border-gray-200 rounded-xl resize-none focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all"
+                                placeholder="Enter detailed reason for this change (minimum 10 characters)..."
+                                className="w-full h-28 p-3 border border-gray-200 rounded-xl resize-none focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all text-sm"
                             />
+                            {statusModal.reason.trim().length > 0 && statusModal.reason.trim().length < 10 && (
+                                <p className="text-xs text-amber-600 font-medium">
+                                    ⚠️ Reason is too short ({statusModal.reason.trim().length}/10 chars minimum). Please provide more context.
+                                </p>
+                            )}
                         </div>
                         <div className="bg-gray-50 px-6 py-4 flex items-center justify-end gap-3 border-t border-gray-100">
                             <button
@@ -556,7 +628,7 @@ const SLAPage: React.FC = () => {
                             </button>
                             <button
                                 onClick={handleSaveStatus}
-                                disabled={!statusModal.reason.trim()}
+                                disabled={statusModal.reason.trim().length < 10}
                                 className="px-6 py-2 bg-gradient-to-r from-brand-red to-[#d41c34] hover:from-[#d41c34] hover:to-[#c01830] text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-red/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Save Changes

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, Ticket as TicketIcon, X, Send, Trash2, CheckCircle, Plus, Calendar, Clock } from 'lucide-react';
+import { ChevronUp, Ticket as TicketIcon, X, Send, Trash2, CheckCircle, Plus, Calendar, Clock, AlertTriangle } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { nowDateIST, nowTimeIST, formatDateWithTZ, formatTimeWithTZ } from '../../utils/dateUtils';
 import { getAuthHeaders, API_URL_SLA } from '../../types/sla';
@@ -290,6 +290,16 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
         const dateObj = new Date(`${tempDate} ${timePart} GMT${offset}`);
 
         if (!isNaN(dateObj.getTime())) {
+            // Proactive safeguard: validate closure is not earlier than start
+            if (slaStartDate && slaStartTime && slaStartTime !== '-') {
+                const cleanStart = slaStartTime.replace(' hrs', '').trim();
+                const startObj = new Date(`${slaStartDate} ${cleanStart} GMT+0530`);
+                if (!isNaN(startObj.getTime()) && dateObj.getTime() < startObj.getTime()) {
+                    toast.error(`⚠️ Invalid Close Date: Closure cannot be earlier than SLA start time (${slaStartDate} ${slaStartTime})`, { duration: 5000 });
+                    return;
+                }
+            }
+
             const istDate = formatDateWithTZ(dateObj, 'IST', { day: 'numeric', month: 'short', year: 'numeric' });
             const istTime = formatTimeWithTZ(dateObj, 'IST') + ' hrs';
             setSlaCloseDate(istDate);
@@ -315,6 +325,16 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
         const dateObj = new Date(`${datePart} ${tempTime} GMT${offset}`);
 
         if (!isNaN(dateObj.getTime())) {
+            // Proactive safeguard: validate closure is not earlier than start
+            if (slaStartDate && slaStartTime && slaStartTime !== '-') {
+                const cleanStart = slaStartTime.replace(' hrs', '').trim();
+                const startObj = new Date(`${slaStartDate} ${cleanStart} GMT+0530`);
+                if (!isNaN(startObj.getTime()) && dateObj.getTime() < startObj.getTime()) {
+                    toast.error(`⚠️ Invalid Close Time: Closure cannot be earlier than SLA start time (${slaStartDate} ${slaStartTime})`, { duration: 5000 });
+                    return;
+                }
+            }
+
             const istDate = formatDateWithTZ(dateObj, 'IST', { day: 'numeric', month: 'short', year: 'numeric' });
             const istTime = formatTimeWithTZ(dateObj, 'IST') + ' hrs';
             setSlaCloseDate(istDate);
@@ -336,6 +356,16 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
         const dateObj = new Date(`${tempStartDate} ${timePart} GMT${offset}`);
 
         if (!isNaN(dateObj.getTime())) {
+            // Proactive safeguard: validate start is not later than close
+            if (slaCloseDate && slaCloseTime && slaCloseTime !== '-' && slaCloseDate !== '-') {
+                const cleanClose = slaCloseTime.replace(' hrs', '').trim();
+                const closeObj = new Date(`${slaCloseDate} ${cleanClose} GMT+0530`);
+                if (!isNaN(closeObj.getTime()) && dateObj.getTime() > closeObj.getTime()) {
+                    toast.error(`⚠️ Invalid Start Date: Start time cannot be later than SLA closure time (${slaCloseDate} ${slaCloseTime})`, { duration: 5000 });
+                    return;
+                }
+            }
+
             const istDate = formatDateWithTZ(dateObj, 'IST', { day: 'numeric', month: 'short', year: 'numeric' });
             const istTime = formatTimeWithTZ(dateObj, 'IST') + ' hrs';
             setSlaStartDate(istDate);
@@ -361,6 +391,16 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
         const dateObj = new Date(`${datePart} ${tempStartTime} GMT${offset}`);
 
         if (!isNaN(dateObj.getTime())) {
+            // Proactive safeguard: validate start is not later than close
+            if (slaCloseDate && slaCloseTime && slaCloseTime !== '-' && slaCloseDate !== '-') {
+                const cleanClose = slaCloseTime.replace(' hrs', '').trim();
+                const closeObj = new Date(`${slaCloseDate} ${cleanClose} GMT+0530`);
+                if (!isNaN(closeObj.getTime()) && dateObj.getTime() > closeObj.getTime()) {
+                    toast.error(`⚠️ Invalid Start Time: Start time cannot be later than SLA closure time (${slaCloseDate} ${slaCloseTime})`, { duration: 5000 });
+                    return;
+                }
+            }
+
             const istDate = formatDateWithTZ(dateObj, 'IST', { day: 'numeric', month: 'short', year: 'numeric' });
             const istTime = formatTimeWithTZ(dateObj, 'IST') + ' hrs';
             setSlaStartDate(istDate);
@@ -621,9 +661,14 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                         <div className="mt-2 pt-4 border-t border-gray-50">
                             <div className="flex justify-between items-center text-[14px] mb-1">
                                 <span className="text-gray-400 font-medium">SLA Status</span>
-                                <span className={`text-[13px] font-black px-2 py-0.5 rounded-full ${slaStatus === 'Breached' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+                                <span className={`text-[13px] font-black px-2.5 py-0.5 rounded-full ${
+                                    slaStatus === 'Breached' || slaStatus === 'BREACHED'
+                                        ? 'bg-red-50 text-red-600 border border-red-100'
+                                        : slaStatus === 'No SLA'
+                                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                            : 'bg-green-50 text-green-600 border border-green-100'
                                     }`}>
-                                    {slaStatus}
+                                    {slaStatus === 'No SLA' ? 'No SLA Set' : slaStatus}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center text-[14px]">
@@ -633,6 +678,15 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                                     {slaCompensation}
                                 </span>
                             </div>
+                            {slaStatus === 'No SLA' && (
+                                <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl text-amber-800 text-[11px] flex items-start gap-2 mt-3 shadow-xs">
+                                    <AlertTriangle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="font-bold text-amber-900">⚠️ No SLA Rules Configured</p>
+                                        <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">This circuit has no active SLA rules. Go to <strong>Dashboard &gt; SLA</strong> to define rules so availability and compensation can calculate.</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -840,6 +894,29 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                                 />
                             </div>
 
+                            {(() => {
+                                if (!tempTime || !slaStartDate || !slaStartTime || slaStartTime === '-') return null;
+                                const offsets: Record<string, string> = { 'UTC': '+0000', 'GMT': '+0000', 'IST': '+0530' };
+                                const offset = offsets[slaTimeZone] || '+0000';
+                                let datePart = dynamicSlaClose.date;
+                                if (datePart === '-') {
+                                    const now = new Date();
+                                    datePart = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                                }
+                                const candidateObj = new Date(`${datePart} ${tempTime} GMT${offset}`);
+                                const cleanStart = slaStartTime.replace(' hrs', '').trim();
+                                const startObj = new Date(`${slaStartDate} ${cleanStart} GMT+0530`);
+                                if (!isNaN(candidateObj.getTime()) && !isNaN(startObj.getTime()) && candidateObj.getTime() < startObj.getTime()) {
+                                    return (
+                                        <div className="w-full mb-6 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs text-left flex items-start gap-2 animate-in fade-in duration-200">
+                                            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+                                            <span><strong>Warning:</strong> Selected time is earlier than SLA start time ({slaStartDate} {slaStartTime}).</span>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
                             <button
                                 onClick={handleSaveTime}
                                 className="w-full h-[56px] bg-[#0F172A] text-white font-bold rounded-2xl text-[15px] shadow-[0_8px_32px_rgba(15,23,42,0.2)] hover:bg-[#1E293B] hover:-translate-y-0.5 transition-all active:scale-95"
@@ -875,6 +952,29 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                                     className="w-full h-[56px] border border-gray-100 bg-gray-50/50 rounded-2xl px-6 text-[16px] font-bold text-gray-900 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 focus:bg-white transition-all"
                                 />
                             </div>
+
+                            {(() => {
+                                if (!tempStartTime || !slaCloseDate || !slaCloseTime || slaCloseDate === '-' || slaCloseTime === '-') return null;
+                                const offsets: Record<string, string> = { 'UTC': '+0000', 'GMT': '+0000', 'IST': '+0530' };
+                                const offset = offsets[slaTimeZone] || '+0000';
+                                let datePart = dynamicSlaStart.date;
+                                if (datePart === '-') {
+                                    const now = new Date();
+                                    datePart = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                                }
+                                const candidateObj = new Date(`${datePart} ${tempStartTime} GMT${offset}`);
+                                const cleanClose = slaCloseTime.replace(' hrs', '').trim();
+                                const closeObj = new Date(`${slaCloseDate} ${cleanClose} GMT+0530`);
+                                if (!isNaN(candidateObj.getTime()) && !isNaN(closeObj.getTime()) && candidateObj.getTime() > closeObj.getTime()) {
+                                    return (
+                                        <div className="w-full mb-6 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs text-left flex items-start gap-2 animate-in fade-in duration-200">
+                                            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+                                            <span><strong>Warning:</strong> Selected start time is later than SLA closure time ({slaCloseDate} {slaCloseTime}).</span>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
 
                             <button
                                 onClick={handleSaveStartTime}
@@ -912,6 +1012,25 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                                 />
                             </div>
 
+                            {(() => {
+                                if (!tempDate || !slaStartDate || !slaStartTime || slaStartTime === '-') return null;
+                                const offsets: Record<string, string> = { 'UTC': '+0000', 'GMT': '+0000', 'IST': '+0530' };
+                                const offset = offsets[slaTimeZone] || '+0000';
+                                const timePart = dynamicSlaClose.time !== '-' ? dynamicSlaClose.time.replace(' hrs', '') : '00:00';
+                                const candidateObj = new Date(`${tempDate} ${timePart} GMT${offset}`);
+                                const cleanStart = slaStartTime.replace(' hrs', '').trim();
+                                const startObj = new Date(`${slaStartDate} ${cleanStart} GMT+0530`);
+                                if (!isNaN(candidateObj.getTime()) && !isNaN(startObj.getTime()) && candidateObj.getTime() < startObj.getTime()) {
+                                    return (
+                                        <div className="w-full mb-6 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs text-left flex items-start gap-2 animate-in fade-in duration-200">
+                                            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+                                            <span><strong>Warning:</strong> Selected closure date is earlier than SLA start date ({slaStartDate}).</span>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
                             <button
                                 onClick={handleSaveDate}
                                 className="w-full h-[56px] bg-[#0F172A] text-white font-bold rounded-2xl text-[15px] shadow-[0_8px_32px_rgba(15,23,42,0.2)] hover:bg-[#1E293B] hover:-translate-y-0.5 transition-all active:scale-95"
@@ -947,6 +1066,25 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                                     className="w-full h-[56px] border border-gray-100 bg-gray-50/50 rounded-2xl px-6 text-[16px] font-bold text-gray-900 outline-none focus:ring-4 focus:ring-orange-500/5 focus:border-orange-500 focus:bg-white transition-all"
                                 />
                             </div>
+
+                            {(() => {
+                                if (!tempStartDate || !slaCloseDate || !slaCloseTime || slaCloseDate === '-' || slaCloseTime === '-') return null;
+                                const offsets: Record<string, string> = { 'UTC': '+0000', 'GMT': '+0000', 'IST': '+0530' };
+                                const offset = offsets[slaTimeZone] || '+0000';
+                                const timePart = dynamicSlaStart.time !== '-' ? dynamicSlaStart.time.replace(' hrs', '') : '00:00';
+                                const candidateObj = new Date(`${tempStartDate} ${timePart} GMT${offset}`);
+                                const cleanClose = slaCloseTime.replace(' hrs', '').trim();
+                                const closeObj = new Date(`${slaCloseDate} ${cleanClose} GMT+0530`);
+                                if (!isNaN(candidateObj.getTime()) && !isNaN(closeObj.getTime()) && candidateObj.getTime() > closeObj.getTime()) {
+                                    return (
+                                        <div className="w-full mb-6 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs text-left flex items-start gap-2 animate-in fade-in duration-200">
+                                            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+                                            <span><strong>Warning:</strong> Selected start date is later than SLA closure date ({slaCloseDate}).</span>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
 
                             <button
                                 onClick={handleSaveStartDate}

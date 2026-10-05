@@ -169,6 +169,19 @@ export const SLARulesModal: React.FC<SLARulesModalProps> = ({ isOpen, onClose })
     const handleSave = async () => {
         if (!selectedCircuit || !targetType || !selectedEntityId) return;
 
+        // Validate rule completeness and bounds before attempting save
+        for (let i = 0; i < conditions.length; i++) {
+            const c = conditions[i];
+            if (c.lowerLimit !== null && c.upperLimit !== null && c.lowerLimit > c.upperLimit) {
+                setError(`Range ${i + 1}: Lower limit (${c.lowerLimit}%) cannot be greater than upper limit (${c.upperLimit}%).`);
+                return;
+            }
+            if (c.compensationPercentage < 0 || c.compensationPercentage > 100) {
+                setError(`Range ${i + 1}: Service credit percentage must be between 0% and 100%.`);
+                return;
+            }
+        }
+
         setAddStep('saving');
         setError('');
 
@@ -665,6 +678,16 @@ export const SLARulesModal: React.FC<SLARulesModalProps> = ({ isOpen, onClose })
                                     </button>
                                 </div>
 
+                                {selectedCircuit && (!selectedCircuit.mrc || selectedCircuit.mrc === 0) && (
+                                    <div className="mb-4 p-3.5 bg-amber-50 border border-amber-200/90 rounded-xl text-amber-800 text-xs flex items-start gap-2.5">
+                                        <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <strong className="font-bold text-amber-900 block mb-0.5">⚠️ Notice: Circuit MRC is $0.00</strong>
+                                            <span>SLA breach compensation is calculated as % of Monthly Recurring Charge (MRC). Because this circuit's MRC is currently <strong>$0</strong>, dollar compensation will evaluate to <strong>$0.00</strong> until MRC is updated in Inventory.</span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="mb-5 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
                                    <div className="flex items-start gap-3">
                                        <Info size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
@@ -757,13 +780,14 @@ export const SLARulesModal: React.FC<SLARulesModalProps> = ({ isOpen, onClose })
                                             </div>
 
                                             {/* Compensation row */}
-                                        <div className="mt-3 flex items-center gap-3">
+                                            <div className="mt-3 flex items-center gap-3">
                                                 <label className="text-[11px] font-bold text-gray-400 uppercase whitespace-nowrap">Service Credit:</label>
                                                 <div className="flex items-center gap-1">
                                                     <input
                                                         type="number"
                                                         step="0.1"
                                                         min="0"
+                                                        max="100"
                                                         placeholder="0"
                                                         value={cond.compensationPercentage || ''}
                                                         onChange={e => updateCondition(index, 'compensationPercentage', parseFloat(e.target.value) || 0)}
@@ -772,6 +796,20 @@ export const SLARulesModal: React.FC<SLARulesModalProps> = ({ isOpen, onClose })
                                                     <span className="text-sm font-bold text-gray-400">% of MRC</span>
                                                 </div>
                                             </div>
+
+                                            {/* Inverted bounds inline warning */}
+                                            {cond.lowerLimit !== null && cond.upperLimit !== null && cond.lowerLimit > cond.upperLimit && (
+                                                <div className="mt-2.5 p-2 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs flex items-center gap-1.5 animate-in fade-in duration-200">
+                                                    <AlertCircle size={14} className="flex-shrink-0" />
+                                                    <span><strong>Inverted range:</strong> Lower limit ({cond.lowerLimit}%) cannot be higher than Upper limit ({cond.upperLimit}%).</span>
+                                                </div>
+                                            )}
+                                            {(cond.compensationPercentage < 0 || cond.compensationPercentage > 100) && (
+                                                <div className="mt-2.5 p-2 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs flex items-center gap-1.5 animate-in fade-in duration-200">
+                                                    <AlertCircle size={14} className="flex-shrink-0" />
+                                                    <span><strong>Invalid credit:</strong> Percentage must be between 0% and 100%.</span>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

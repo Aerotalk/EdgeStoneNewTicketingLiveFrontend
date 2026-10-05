@@ -756,6 +756,9 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
             localStorage.setItem(`ticket_status_${ticket.id}`, newStatus);
 
             if (newStatus.toLowerCase() === 'closed') {
+                if (!ticket.circuitId && !confirmedCircuit) {
+                    toast.error("⚠️ Notice: Ticket has no Circuit ID assigned. SLA availability cannot be tracked.", { duration: 5000 });
+                }
                 const dateStr = nowDateIST();
                 const timeStr = nowTimeIST();
                 const fullStr = `${dateStr} • ${timeStr}`;
