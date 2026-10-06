@@ -362,7 +362,17 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 targetTo = tabRecipients['client'].to.filter(e => !allVendorEmails.has(e.toLowerCase()));
             }
             if (targetTo.length === 0) {
-                targetTo = ticket.email ? [ticket.email] : [];
+                if (ticket.ticketType === 'Vendor') {
+                    if (ticket.client?.emails?.length) {
+                        targetTo = [ticket.client.emails[0]];
+                    } else if (ticketCircuit?.client?.emails?.length) {
+                        targetTo = [ticketCircuit.client.emails[0]];
+                    } else {
+                        targetTo = [];
+                    }
+                } else {
+                    targetTo = ticket.email ? [ticket.email] : [];
+                }
             }
             targetCc = tabRecipients['client']?.cc || [];
             targetBcc = tabRecipients['client']?.bcc || [];
@@ -1324,13 +1334,18 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 <div className="flex items-center justify-between px-6">
                     <div className="flex items-center gap-8">
 
-                        {ticket.ticketType !== 'Vendor' && (
+                        {(ticket.ticketType !== 'Vendor' || ticket.isMaintenance || ticket.status?.toLowerCase() === 'maintenance') && (
                             <button
                                 onClick={() => switchTab('client')}
                                 className={`flex items-center gap-2 py-4 text-[14px] font-bold transition-all border-b-2 ${activeTab === 'client' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                             >
                                 <User size={18} />
                                 Client
+                                {replies.filter(r => isReplyForTab(r, 'client', ticketCircuit)).length > 0 && (
+                                    <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-indigo-500 text-white rounded-full">
+                                        {replies.filter(r => isReplyForTab(r, 'client', ticketCircuit)).length}
+                                    </span>
+                                )}
                             </button>
                         )}
                         {ticketCircuit?.isMultiVendor && ticketCircuit?.vendorCircuits ? (
@@ -1392,39 +1407,71 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
 
                     {/* Original Client Message (Always visible but maybe distinct based on user preference) */}
                     {activeTab === 'client' && (
-                        <div className="flex gap-4 group">
-                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shadow-sm flex-shrink-0">
-                                {ticket.name[0].toUpperCase()}
-                            </div>
-                            <div className="flex-1">
-                                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm relative">
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="space-y-0.5">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-[15px] font-bold text-gray-900">{ticket.name}</span>
-                                                <span className="text-[14px] text-gray-400 font-medium">&lt;{ticket.email}&gt;</span>
+                        ticket.ticketType === 'Vendor' ? (
+                            <div className="flex gap-4 group">
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shadow-sm flex-shrink-0">
+                                    {(ticket.client?.name?.[0] || ticketCircuit?.client?.name?.[0] || 'C').toUpperCase()}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm relative">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="space-y-0.5">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[15px] font-bold text-gray-900">{ticket.client?.name || ticketCircuit?.client?.name || 'Client'}</span>
+                                                    <span className="text-[14px] text-gray-400 font-medium">&lt;{(ticket.client?.emails && ticket.client.emails[0]) || (ticketCircuit?.client?.emails && ticketCircuit.client.emails[0]) || 'client@contact'}&gt;</span>
+                                                </div>
+                                                <p className="text-[13px] text-gray-400 font-medium">Circuit: {confirmedCircuit || ticket.circuitId}</p>
                                             </div>
-                                            <p className="text-[13px] text-gray-400 font-medium">To: support@edgestone.in</p>
-                                        </div>
-                                        <div className="flex items-center gap-4 text-gray-400">
-                                            <span className="text-[13px] font-medium">{formatDateWithTZ(ticket.createdAt || ticket.date, globalTimeZone, { day: 'numeric', month: 'short', year: 'numeric' })} • {ticket.receivedAt ? formatTimeWithTZ(ticket.receivedAt, globalTimeZone) : formatTimeWithTZ(ticket.createdAt, globalTimeZone)} hrs</span>
-                                            <div className="flex items-center gap-2.5">
-                                                <button className="hover:text-gray-600"><CornerUpLeft size={16} /></button>
-                                                <button className="hover:text-gray-600" onClick={() => setShowEmailModal(true)}><ReplyIcon size={16} className="-scale-x-100" /></button>
-                                                <button className="hover:text-gray-600"><MoreVertical size={16} /></button>
+                                            <div className="flex items-center gap-4 text-gray-400">
+                                                <span className="text-[13px] font-medium">Client Coordination Thread</span>
+                                                <div className="flex items-center gap-2.5">
+                                                    <button className="hover:text-gray-600" onClick={() => setShowEmailModal(true)}><ReplyIcon size={16} className="-scale-x-100" /></button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div className="text-[14px] text-gray-600 leading-relaxed font-medium space-y-4 whitespace-pre-wrap break-all">
-                                        {replies.length > 0 && replies[0].type === 'client'
-                                            ? replies[0].text
-                                            : 'No message content available'}
+                                        <div className="text-[14px] text-gray-500 leading-relaxed font-medium italic">
+                                            This thread is for client coordination regarding this maintenance window. Use the Reply button below to notify or update the client.
+                                        </div>
+                                        <div className="absolute left-[-17px] top-5 w-4 h-4 bg-white border-l border-b border-gray-100 rotate-45"></div>
                                     </div>
-                                    <div className="absolute left-[-17px] top-5 w-4 h-4 bg-white border-l border-b border-gray-100 rotate-45"></div>
                                 </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="flex gap-4 group">
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shadow-sm flex-shrink-0">
+                                    {ticket.name[0].toUpperCase()}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm relative">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="space-y-0.5">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[15px] font-bold text-gray-900">{ticket.name}</span>
+                                                    <span className="text-[14px] text-gray-400 font-medium">&lt;{ticket.email}&gt;</span>
+                                                </div>
+                                                <p className="text-[13px] text-gray-400 font-medium">To: support@edgestone.in</p>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-gray-400">
+                                                <span className="text-[13px] font-medium">{formatDateWithTZ(ticket.createdAt || ticket.date, globalTimeZone, { day: 'numeric', month: 'short', year: 'numeric' })} • {ticket.receivedAt ? formatTimeWithTZ(ticket.receivedAt, globalTimeZone) : formatTimeWithTZ(ticket.createdAt, globalTimeZone)} hrs</span>
+                                                <div className="flex items-center gap-2.5">
+                                                    <button className="hover:text-gray-600"><CornerUpLeft size={16} /></button>
+                                                    <button className="hover:text-gray-600" onClick={() => setShowEmailModal(true)}><ReplyIcon size={16} className="-scale-x-100" /></button>
+                                                    <button className="hover:text-gray-600"><MoreVertical size={16} /></button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="text-[14px] text-gray-600 leading-relaxed font-medium space-y-4 whitespace-pre-wrap break-all">
+                                            {replies.length > 0 && replies[0].type === 'client'
+                                                ? replies[0].text
+                                                : 'No message content available'}
+                                        </div>
+                                        <div className="absolute left-[-17px] top-5 w-4 h-4 bg-white border-l border-b border-gray-100 rotate-45"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        )
                     )}
 
                     {activeTab.startsWith('vendor') && (
@@ -1479,8 +1526,8 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                     )}
 
 
-                    {/* Auto Reply (Only in client tab) */}
-                    {activeTab === 'client' && (
+                    {/* Auto Reply (Only in client tab for client tickets) */}
+                    {activeTab === 'client' && ticket.ticketType !== 'Vendor' && (
                         <div className="flex gap-4">
                             <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-sm shadow-sm flex-shrink-0">
                                 ES
@@ -1518,7 +1565,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                         </div>
                     )}
 
-                    {activeTab === 'client' && <div className="ml-5 border-l-2 border-gray-100 py-1"></div>}
+                    {activeTab === 'client' && ticket.ticketType !== 'Vendor' && <div className="ml-5 border-l-2 border-gray-100 py-1"></div>}
 
                     {replies.filter(r => isReplyForTab(r, activeTab, ticketCircuit)).map((reply, idx) => (
                         <div key={idx} className="flex flex-col">

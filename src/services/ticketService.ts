@@ -35,8 +35,8 @@ export interface Ticket {
     ticketType?: string;
     clientId?: string;
     vendorId?: string;
-    client?: { id?: string; name: string };
-    vendor?: { id?: string; name: string };
+    client?: { id?: string; name: string; emails?: string[] };
+    vendor?: { id?: string; name: string; emails?: string[] };
     // Add other fields as needed
 }
 
