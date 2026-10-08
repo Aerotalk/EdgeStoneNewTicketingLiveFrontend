@@ -35,6 +35,8 @@ interface TicketInfoSidebarProps {
         isMaintenance?: boolean;
         circuitId?: string | null;
         ticketType?: string;
+        vendor?: { id?: string; name?: string; emails?: string[] };
+        client?: { id?: string; name?: string; emails?: string[] };
     };
     priority?: string;
     circuit?: string;
@@ -492,7 +494,7 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                                 {activeTab?.startsWith('vendor') ? (vendorName || 'EdgeStone Vendor') : (clientName || ticket.name)}
                             </h3>
                             <p className="text-[13px] text-gray-500 font-medium mt-0.5 truncate">
-                                {activeTab?.startsWith('vendor') ? (vendorEmail || 'Fetching vendor...') : (clientEmail || ticket.email)}
+                                {activeTab?.startsWith('vendor') ? (vendorEmail || (ticket.vendor?.emails ? ticket.vendor.emails.join(', ') : (ticket.ticketType === 'Vendor' ? ticket.email : 'Fetching vendor...'))) : (clientEmail || (ticket.client?.emails ? ticket.client.emails.join(', ') : ticket.email))}
                             </p>
                         </div>
                     </div>

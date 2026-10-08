@@ -284,15 +284,28 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
     const [tabRecipients, setTabRecipients] = useState<Record<string, { to: string[], cc: string[], bcc: string[] }>>({});
     const [vendorEmailsByTab, setVendorEmailsByTab] = useState<Record<string, string[]>>({});
 
+    // Dedicated set of true Client emails (strictly separated from Vendor emails)
+    const clientEmailsSet = useMemo(() => {
+        const set = new Set<string>();
+        if (ticket.client?.emails) {
+            ticket.client.emails.forEach((e: string) => set.add(e.toLowerCase().trim()));
+        }
+        if (ticket.ticketType !== 'Vendor' && ticket.email) {
+            set.add(ticket.email.toLowerCase().trim());
+        }
+        return set;
+    }, [ticket.client, ticket.ticketType, ticket.email]);
+
     // Reset emailForm whenever the ticket changes so stale data from a previous ticket don't bleed in
     useEffect(() => {
         setTabRecipients({});
         setVendorEmailsByTab({});
+        const initialVendorEmails = ticket.vendor?.emails || (ticket.ticketType === 'Vendor' && ticket.email ? [ticket.email] : []);
         setEmailForm({
             from: 'support@edgestone.in',
-            to: (activeTab === 'vendor' || activeTab.startsWith('vendor_') || ticket.ticketType === 'Vendor')
-                ? []
-                : (ticket.email ? [ticket.email] : []),
+            to: (activeTab === 'vendor' || activeTab.startsWith('vendor_'))
+                ? initialVendorEmails
+                : (ticket.ticketType === 'Vendor' ? (ticket.client?.emails?.[0] ? [ticket.client.emails[0]] : []) : (ticket.email ? [ticket.email] : [])),
             cc: [],
             bcc: [],
             subject: getLockedSubject(activeTab)
@@ -305,37 +318,52 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         return localStorage.getItem(`confirmed_circuit_id_${ticket.id}`) || ticket.circuitId || '';
     });
 
-    // Dedicated memoized vendor emails for the current active tab (strictly excluding client email)
+    // Dedicated memoized vendor emails for the current active tab (strictly excluding client emails)
     const currentVendorEmails = useMemo(() => {
         if (!activeTab.startsWith('vendor')) return [];
-        const clientEmailLower = ticket.email?.toLowerCase();
         if (vendorEmailsByTab[activeTab] && vendorEmailsByTab[activeTab].length > 0) {
-            return vendorEmailsByTab[activeTab].filter(e => e.toLowerCase() !== clientEmailLower);
+            const filtered = vendorEmailsByTab[activeTab].filter(e => !clientEmailsSet.has(e.toLowerCase().trim()));
+            if (filtered.length > 0) return filtered;
         }
         if (tabRecipients[activeTab]?.to && tabRecipients[activeTab].to.length > 0) {
-            return tabRecipients[activeTab].to.filter(e => e.toLowerCase() !== clientEmailLower);
+            const filtered = tabRecipients[activeTab].to.filter(e => !clientEmailsSet.has(e.toLowerCase().trim()));
+            if (filtered.length > 0) return filtered;
+        }
+        if (ticket.vendor?.emails && ticket.vendor.emails.length > 0) {
+            const filtered = ticket.vendor.emails.filter((e: string) => !clientEmailsSet.has(e.toLowerCase().trim()));
+            if (filtered.length > 0) return filtered;
+        }
+        if (ticket.ticketType === 'Vendor' && ticket.email && !clientEmailsSet.has(ticket.email.toLowerCase().trim())) {
+            return [ticket.email];
         }
         return [];
-    }, [activeTab, vendorEmailsByTab, tabRecipients, ticket.email]);
+    }, [activeTab, vendorEmailsByTab, tabRecipients, clientEmailsSet, ticket.vendor, ticket.ticketType, ticket.email]);
 
     // Guaranteed safe display vendor email for thread card
     const displayVendorEmail = useMemo(() => {
         if (currentVendorEmails.length > 0) return currentVendorEmails[0];
-        const clientEmailLower = ticket.email?.toLowerCase();
-        const nonClientEmail = emailForm.to.find(e => e.toLowerCase() !== clientEmailLower);
-        return (activeTab.startsWith('vendor') && nonClientEmail) ? nonClientEmail : 'vendor@example.com';
-    }, [currentVendorEmails, emailForm.to, activeTab, ticket.email]);
+        const nonClientEmail = emailForm.to.find(e => !clientEmailsSet.has(e.toLowerCase().trim()));
+        if (activeTab.startsWith('vendor') && nonClientEmail) return nonClientEmail;
+        if (ticket.vendor?.emails && ticket.vendor.emails.length > 0) return ticket.vendor.emails[0];
+        if (ticket.ticketType === 'Vendor' && ticket.email && !clientEmailsSet.has(ticket.email.toLowerCase().trim())) {
+            return ticket.email;
+        }
+        return 'vendor@example.com';
+    }, [currentVendorEmails, emailForm.to, activeTab, clientEmailsSet, ticket.vendor, ticket.ticketType, ticket.email]);
 
     // Guaranteed safe vendor emails for sidebar profile
     const sidebarVendorEmail = useMemo(() => {
         if (currentVendorEmails.length > 0) return currentVendorEmails.join(', ');
         if (activeTab.startsWith('vendor')) {
-            const clientEmailLower = ticket.email?.toLowerCase();
-            const nonClientEmails = emailForm.to.filter(e => e.toLowerCase() !== clientEmailLower);
-            return nonClientEmails.join(', ');
+            const nonClientEmails = emailForm.to.filter(e => !clientEmailsSet.has(e.toLowerCase().trim()));
+            if (nonClientEmails.length > 0) return nonClientEmails.join(', ');
+            if (ticket.vendor?.emails && ticket.vendor.emails.length > 0) return ticket.vendor.emails.join(', ');
+            if (ticket.ticketType === 'Vendor' && ticket.email && !clientEmailsSet.has(ticket.email.toLowerCase().trim())) {
+                return ticket.email;
+            }
         }
         return '';
-    }, [currentVendorEmails, emailForm.to, activeTab, ticket.email]);
+    }, [currentVendorEmails, emailForm.to, activeTab, clientEmailsSet, ticket.vendor, ticket.ticketType, ticket.email]);
 
     // Centralized instant tab switcher that synchronizes email recipients synchronously
     const switchTab = useCallback((newTab: string) => {
@@ -391,11 +419,14 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 targetCc = Array.from(clientCcs);
             }
         } else if (newTab.startsWith('vendor')) {
-            const clientEmailLower = ticket.email?.toLowerCase();
             if (tabRecipients[newTab]?.to && tabRecipients[newTab].to.length > 0) {
-                targetTo = tabRecipients[newTab].to.filter(e => e.toLowerCase() !== clientEmailLower);
+                targetTo = tabRecipients[newTab].to.filter(e => !clientEmailsSet.has(e.toLowerCase().trim()));
             } else if (vendorEmailsByTab[newTab]?.length) {
-                targetTo = vendorEmailsByTab[newTab].filter(e => e.toLowerCase() !== clientEmailLower);
+                targetTo = vendorEmailsByTab[newTab].filter(e => !clientEmailsSet.has(e.toLowerCase().trim()));
+            } else if (ticket.vendor?.emails && ticket.vendor.emails.length > 0) {
+                targetTo = ticket.vendor.emails.filter((e: string) => !clientEmailsSet.has(e.toLowerCase().trim()));
+            } else if (ticket.ticketType === 'Vendor' && ticket.email && !clientEmailsSet.has(ticket.email.toLowerCase().trim())) {
+                targetTo = [ticket.email];
             } else {
                 targetTo = [];
             }
@@ -485,7 +516,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         setTicketStatus(ticket.status || localStorage.getItem(`ticket_status_${ticket.id}`) || 'Open');
     }, [ticket.id, ticket.status]);
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-    const [vendorName, setVendorName] = useState<string>('');
+    const [vendorName, setVendorName] = useState<string>(() => ticket.vendor?.name || '');
     const [closedAt, setClosedAt] = useState(() => {
         return localStorage.getItem(`ticket_closed_at_${ticket.id}`) || '';
     });
