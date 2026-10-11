@@ -16,6 +16,7 @@ const AssignAgentsPage = lazy(() => import('./pages/dashboard/AssignAgentsPage')
 const SLAPage = lazy(() => import('./pages/dashboard/SLAPage'))
 const CircuitsPage = lazy(() => import('./pages/dashboard/CircuitsPage'))
 const TicketRoadmapView = lazy(() => import('./pages/dashboard/TicketRoadmapView'))
+const DocsPage = lazy(() => import('./pages/DocsPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 const PageLoader = () => (
@@ -49,7 +50,15 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="sla" element={<SLAPage />} />
+              <Route path="docs" element={<DocsPage embedded={true} />} />
             </Route>
+
+            {/* Formal User Manual & Documentation — Accessible only after login */}
+            <Route path="/docs" element={
+              <ProtectedRoute>
+                <DocsPage />
+              </ProtectedRoute>
+            } />
 
             {/* Roadmap standalone route */}
             <Route path="/roadmap" element={<TicketRoadmapView />} />

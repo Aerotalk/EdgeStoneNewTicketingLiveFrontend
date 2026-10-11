@@ -12,7 +12,8 @@ import {
     MoreVertical,
     LogOut,
     X,
-    Zap
+    Zap,
+    BookOpen
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import SignaturesPage from '../../pages/dashboard/SignaturesPage';
@@ -44,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ agentName, isMobileOpen, onClo
         { icon: Zap, label: 'Circuits', path: 'circuits', restricted: true },
         { icon: UserPlus, label: 'Assign agent', path: 'assign-agents', superAdminOnly: true },
         { icon: FileText, label: 'SLA', path: 'sla', restricted: true },
+        { icon: BookOpen, label: 'User Manual', path: 'docs' },
     ];
 
     // Filter menu items based on user role
