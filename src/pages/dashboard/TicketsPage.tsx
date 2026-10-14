@@ -27,7 +27,7 @@ const TicketsPage: React.FC = () => {
     const { refresh: refreshDashboard } = useDashboardData();
     const { canDelete } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
-    const urlTicketId = searchParams.get('ticketId');
+    const urlTicketId = searchParams.get('ticketId') || searchParams.get('search');
     const [activeTab, setActiveTab] = useState('open');
     const [searchQuery, setSearchQuery] = useState('');
     const [appliedFilter, setAppliedFilter] = useState<FilterType>('all');
@@ -104,8 +104,11 @@ const TicketsPage: React.FC = () => {
 
     useEffect(() => {
         if (urlTicketId && tickets.length > 0) {
-            const cleanUrlId = urlTicketId.toLowerCase().replace(/^#+/, '');
-            const matched = tickets.find(t => t.ticketId && t.ticketId.toLowerCase().replace(/^#+/, '') === cleanUrlId);
+            const cleanUrlId = urlTicketId.toLowerCase().replace(/^#+/, '').trim();
+            const matched = tickets.find(t => 
+                (t.ticketId && t.ticketId.toLowerCase().replace(/^#+/, '').trim() === cleanUrlId) ||
+                (t.id && String(t.id).toLowerCase() === cleanUrlId)
+            );
             if (matched) {
                 setSelectedTicket(matched);
                 if (matched.status) {
@@ -197,8 +200,16 @@ const TicketsPage: React.FC = () => {
                     ticket={selectedTicket}
                     onBack={() => {
                         setSelectedTicket(null);
+                        let hasChanges = false;
                         if (searchParams.has('ticketId')) {
                             searchParams.delete('ticketId');
+                            hasChanges = true;
+                        }
+                        if (searchParams.has('search')) {
+                            searchParams.delete('search');
+                            hasChanges = true;
+                        }
+                        if (hasChanges) {
                             setSearchParams(searchParams);
                         }
                         fetchTickets();

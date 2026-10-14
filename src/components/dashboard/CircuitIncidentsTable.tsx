@@ -78,7 +78,8 @@ export const CircuitIncidentsTable: React.FC<CircuitIncidentsTableProps> = ({
 
     const handleNavigateToTicket = (ticketId: string) => {
         const userId = routeUserId || 'default';
-        navigate(`/dashboard/${userId}/tickets?search=${encodeURIComponent(ticketId)}`);
+        const cleanId = ticketId.replace(/^#+/, '').trim();
+        navigate(`/dashboard/${userId}/tickets?ticketId=${encodeURIComponent(cleanId)}`);
     };
 
     return (
@@ -326,14 +327,14 @@ export const CircuitIncidentsTable: React.FC<CircuitIncidentsTableProps> = ({
                                                     <button
                                                         key={t.id}
                                                         onClick={() => handleNavigateToTicket(t.ticketId)}
-                                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold border transition-all ${
+                                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                                                             t.isNewToday
-                                                                ? 'bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100'
-                                                                : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                                                                ? 'bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100 hover:border-rose-400'
+                                                                : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200 hover:border-gray-300'
                                                         }`}
-                                                        title={`Click to open ${t.ticketId}: ${t.header}`}
+                                                        title={`Click to open ticket #${t.ticketId.replace(/^#+/, '')}: ${t.header}`}
                                                     >
-                                                        <span>{t.ticketId}</span>
+                                                        <span>{t.ticketId.startsWith('#') ? t.ticketId : `#${t.ticketId}`}</span>
                                                         <ExternalLink size={10} className="opacity-60" />
                                                     </button>
                                                 ))}
@@ -361,8 +362,9 @@ export const CircuitIncidentsTable: React.FC<CircuitIncidentsTableProps> = ({
                                                         </span>
                                                     </div>
                                                     <p
-                                                        className="text-xs text-gray-700 font-semibold truncate"
-                                                        title={primaryTicket.header}
+                                                        onClick={() => handleNavigateToTicket(primaryTicket.ticketId)}
+                                                        className="text-xs text-gray-700 font-semibold truncate cursor-pointer hover:text-brand-red transition-colors"
+                                                        title={`Click to open ticket #${primaryTicket.ticketId.replace(/^#+/, '')}: ${primaryTicket.header}`}
                                                     >
                                                         {primaryTicket.header}
                                                     </p>
@@ -377,7 +379,8 @@ export const CircuitIncidentsTable: React.FC<CircuitIncidentsTableProps> = ({
                                             {primaryTicket && (
                                                 <button
                                                     onClick={() => handleNavigateToTicket(primaryTicket.ticketId)}
-                                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-brand-red hover:text-white text-gray-700 text-xs font-bold transition-all duration-200 shadow-sm"
+                                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-brand-red hover:text-white text-gray-700 text-xs font-bold transition-all duration-200 shadow-sm cursor-pointer"
+                                                    title={`Click to open ticket #${primaryTicket.ticketId.replace(/^#+/, '')}`}
                                                 >
                                                     <span>View</span>
                                                     <ExternalLink size={12} />

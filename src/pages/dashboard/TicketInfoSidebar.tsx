@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, Ticket as TicketIcon, X, Send, Trash2, CheckCircle, Plus, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { ChevronUp, ChevronDown, Ticket as TicketIcon, X, Send, Trash2, CheckCircle, Plus, Calendar, Clock, AlertTriangle } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { nowDateIST, nowTimeIST, formatDateWithTZ, formatTimeWithTZ } from '../../utils/dateUtils';
 import { getAuthHeaders, API_URL_SLA } from '../../types/sla';
@@ -46,6 +46,7 @@ interface TicketInfoSidebarProps {
     vendorEmail?: string;
     vendorName?: string;
     onTimeZoneChangeActive?: (zone: string) => void;
+    onPriorityChange?: (newPriority: string) => void;
 }
 
 interface ActivityLog {
@@ -58,10 +59,11 @@ interface ActivityLog {
     createdAt?: string; // ISO timestamp — use this for IST formatting when available
 }
 
-export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, priority, circuit, status, closedAt, activeTab, vendorEmail, vendorName, onTimeZoneChangeActive }) => {
+export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, priority, circuit, status, closedAt, activeTab, vendorEmail, vendorName, onTimeZoneChangeActive, onPriorityChange }) => {
     const { id } = useParams();
     const { canDelete } = useAuth();
     const [isNotesOpen, setIsNotesOpen] = useState(false);
+    const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
     const [notes, setNotes] = useState<Note[]>([]);
     const [newNote, setNewNote] = useState('');
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -516,9 +518,80 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                         </div>
                         <div className="flex justify-between items-center text-[14px]">
                             <span className="text-gray-400 font-medium">Priority</span>
-                            <span className={`font-bold ${priority ? 'text-gray-900' : 'text-gray-600'}`}>
-                                {priority || '-'}
-                            </span>
+                            {onPriorityChange ? (
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
+                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                                            priority === 'High'
+                                                ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                                                : priority === 'Low'
+                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                                                : 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
+                                        }`}
+                                        title="Click to change ticket priority"
+                                    >
+                                        <div className="flex items-end gap-[2px] h-3 w-3">
+                                            {[1, 2, 3].map((bar) => {
+                                                const active =
+                                                    priority === 'High' ? true :
+                                                    priority === 'Medium' ? bar <= 2 :
+                                                    bar === 1;
+                                                const barColor =
+                                                    priority === 'High' ? 'bg-red-500' :
+                                                    priority === 'Medium' ? 'bg-amber-500' :
+                                                    'bg-emerald-500';
+                                                return (
+                                                    <div
+                                                        key={bar}
+                                                        className={`w-0.5 rounded-full transition-all ${active ? barColor : 'bg-gray-200'}`}
+                                                        style={{ height: `${bar * 33.3}%` }}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                        <span>{priority || 'Medium'}</span>
+                                        <ChevronDown size={12} className={`text-gray-400 transition-transform ${isPriorityDropdownOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {isPriorityDropdownOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setIsPriorityDropdownOpen(false)} />
+                                            <div className="absolute right-0 mt-1.5 w-36 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden p-1 animate-in fade-in slide-in-from-top-1">
+                                                {(['High', 'Medium', 'Low'] as const).map((p) => (
+                                                    <button
+                                                        key={p}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            onPriorityChange(p);
+                                                            setIsPriorityDropdownOpen(false);
+                                                        }}
+                                                        className={`w-full px-2.5 py-1.5 text-left text-xs font-bold rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                                                            priority === p
+                                                                ? 'bg-gray-100 text-gray-900'
+                                                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                                        }`}
+                                                    >
+                                                        <span className={
+                                                            p === 'High' ? 'text-red-600' :
+                                                            p === 'Medium' ? 'text-amber-600' :
+                                                            'text-emerald-600'
+                                                        }>{p}</span>
+                                                        {priority === p && (
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-gray-900" />
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            ) : (
+                                <span className={`font-bold ${priority ? 'text-gray-900' : 'text-gray-600'}`}>
+                                    {priority || '-'}
+                                </span>
+                            )}
                         </div>
                         {/* <div className="flex justify-between items-center text-[14px]">
                             <span className="text-gray-400 font-medium">Maintenance Mode</span>

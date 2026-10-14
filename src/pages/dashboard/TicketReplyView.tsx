@@ -442,7 +442,9 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
     const [selectedCircuit, setSelectedCircuit] = useState(() => {
         return localStorage.getItem(`confirmed_circuit_id_${ticket.id}`) || ticket.circuitId || '';
     });
-    const [selectedPriority, setSelectedPriority] = useState('');
+    const [selectedPriority, setSelectedPriority] = useState(() => {
+        return localStorage.getItem(`confirmed_priority_${ticket.id}`) || ticket.priority || '';
+    });
     const [openDropdown, setOpenDropdown] = useState<'circuit' | 'priority' | null>(null);
     const [replyText, setReplyText] = useState('');
     const [showEmailModal, setShowEmailModal] = useState(false);
@@ -821,12 +823,15 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
     }, [ticket.circuitId, ticket.id]);
 
     const [confirmedPriority, setConfirmedPriority] = useState(() => {
-        return localStorage.getItem(`confirmed_priority_${ticket.id}`) || '';
+        return localStorage.getItem(`confirmed_priority_${ticket.id}`) || ticket.priority || '';
     });
 
     useEffect(() => {
-        setConfirmedPriority(localStorage.getItem(`confirmed_priority_${ticket.id}`) || '');
-    }, [ticket.id]);
+        setConfirmedPriority(localStorage.getItem(`confirmed_priority_${ticket.id}`) || ticket.priority || '');
+    }, [ticket.id, ticket.priority]);
+
+    const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+    const [isUpdatingPriority, setIsUpdatingPriority] = useState(false);
 
     const [ticketStatus, setTicketStatus] = useState(() => {
         return ticket.status || localStorage.getItem(`ticket_status_${ticket.id}`) || 'Open';
@@ -1261,9 +1266,47 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 priority: selectedPriority,
                 status: newStatus,
             });
+            if (dashboardData?.refresh) {
+                dashboardData.refresh().catch(console.error);
+            }
         } catch (error: any) {
             console.error('Failed to save circuit/priority to DB:', error);
             // UI already updated — don't block the agent, just log it
+        }
+    };
+
+    const handlePriorityChange = async (newPriority: string) => {
+        if (!newPriority) return;
+        const currentP = confirmedPriority || ticket.priority;
+        if (newPriority.toLowerCase() === (currentP || '').toLowerCase()) {
+            setShowPriorityDropdown(false);
+            return;
+        }
+
+        const prevPriority = confirmedPriority || ticket.priority;
+        setConfirmedPriority(newPriority);
+        setSelectedPriority(newPriority);
+        localStorage.setItem(`confirmed_priority_${ticket.id}`, newPriority);
+        setShowPriorityDropdown(false);
+
+        setIsUpdatingPriority(true);
+        const toastId = toast.loading(`Updating priority to ${newPriority}...`);
+        try {
+            await ticketService.updateTicket(ticket.id, {
+                priority: newPriority
+            });
+            toast.success(`Priority updated to ${newPriority}`, { id: toastId });
+            if (dashboardData?.refresh) {
+                dashboardData.refresh().catch(console.error);
+            }
+        } catch (error: any) {
+            console.error('Failed to update priority:', error);
+            setConfirmedPriority(prevPriority);
+            setSelectedPriority(prevPriority);
+            localStorage.setItem(`confirmed_priority_${ticket.id}`, prevPriority);
+            toast.error(error.response?.data?.message || 'Failed to update priority', { id: toastId });
+        } finally {
+            setIsUpdatingPriority(false);
         }
     };
 
@@ -1603,81 +1646,146 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                         <div className="overflow-x-auto scrollbar-hide max-w-full">
                             <GlobalClock />
                         </div>
-                        <div className="relative flex-shrink-0">
-                            {true && (
-                                <>
-                                    <button
-                                        onClick={() => !isUpdatingStatus && setShowStatusDropdown(!showStatusDropdown)}
-                                        disabled={isUpdatingStatus}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-bold border transition-all whitespace-nowrap ${ticketStatus.toLowerCase() === 'closed'
-                                            ? 'bg-green-100/50 text-green-600 border-green-200/30 hover:bg-green-100'
-                                            : ticketStatus.toLowerCase() === 'spam' || ticketStatus.toLowerCase() === 'others' || ticketStatus.toLowerCase() === 'maintenance'
-                                                ? 'bg-gray-100/50 text-gray-600 border-gray-200/30 hover:bg-gray-100'
-                                                : 'bg-orange-100/50 text-orange-600 border-orange-200/30 hover:bg-orange-100'
-                                            } ${isUpdatingStatus ? 'opacity-70 cursor-wait' : ''}`}
-                                    >
-                                        {isUpdatingStatus ? (
-                                            <>
-                                                <Loader2 size={14} className="animate-spin" />
-                                                Updating...
-                                            </>
-                                        ) : (
-                                            <>
-                                                {ticketStatus}
-                                                <ChevronDown size={14} />
-                                            </>
-                                        )}
-                                    </button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {/* Priority Dropdown */}
+                            <div className="relative flex-shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => !isUpdatingPriority && setShowPriorityDropdown(!showPriorityDropdown)}
+                                    disabled={isUpdatingPriority}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-bold border transition-all whitespace-nowrap cursor-pointer ${
+                                        (confirmedPriority || ticket.priority) === 'High'
+                                            ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                                            : (confirmedPriority || ticket.priority) === 'Low'
+                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                                            : 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
+                                    } ${isUpdatingPriority ? 'opacity-70 cursor-wait' : ''}`}
+                                    title="Click to change ticket priority (High / Medium / Low)"
+                                >
+                                    <PriorityIcon
+                                        bars={priorityOptions.find(o => o.label === (confirmedPriority || ticket.priority || 'Medium'))?.bars || [true, true, false]}
+                                        type={((confirmedPriority || ticket.priority) as any) || 'Medium'}
+                                    />
+                                    <span>{confirmedPriority || ticket.priority || 'Medium'}</span>
+                                    <ChevronDown size={14} className={`transition-transform duration-200 ${showPriorityDropdown ? 'rotate-180' : ''}`} />
+                                </button>
 
-                                    {showStatusDropdown && (
-                                        <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-xl z-[110] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                                            {ticketStatus.toLowerCase() !== 'closed' && ticketStatus.toLowerCase() !== 'spam' && ticketStatus.toLowerCase() !== 'others' && ticketStatus.toLowerCase() !== 'maintenance' ? (
-                                                <button
-                                                    onClick={() => handleStatusChange('Closed')}
-                                                    className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-green-600 hover:bg-green-50 transition-colors flex items-center justify-between"
-                                                >
-                                                    Close Ticket
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    onClick={() => handleStatusChange('In Progress')}
-                                                    className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-orange-600 hover:bg-orange-50 transition-colors flex items-center justify-between"
-                                                >
-                                                    Re-Open Ticket as Support
-                                                </button>
-                                            )}
-                                            {ticketStatus.toLowerCase() !== 'spam' && (
-                                                <button
-                                                    onClick={() => handleStatusChange('Spam')}
-                                                    className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                                                >
-                                                    Mark as Spam
-                                                </button>
-                                            )}
-                                            {ticketStatus.toLowerCase() !== 'others' && (
-                                                <button
-                                                    onClick={() => handleStatusChange('Others')}
-                                                    className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                                                >
-                                                    Mark as Others
-                                                </button>
-                                            )}
-                                            {ticketStatus.toLowerCase() !== 'maintenance' && (
-                                                <button
-                                                    onClick={() => handleStatusChange('Maintenance')}
-                                                    className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                                                >
-                                                    Mark as Maintenance
-                                                </button>
-                                            )}
+                                {showPriorityDropdown && (
+                                    <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-100 rounded-xl shadow-xl z-[110] overflow-hidden p-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-3 py-1.5 border-b border-gray-50 mb-1">
+                                            Change Priority
                                         </div>
-                                    )}
+                                        {priorityOptions.map((opt) => {
+                                            const isSelected = (confirmedPriority || ticket.priority) === opt.label;
+                                            return (
+                                                <button
+                                                    key={opt.label}
+                                                    type="button"
+                                                    onClick={() => handlePriorityChange(opt.label)}
+                                                    className={`w-full px-3 py-2 text-left text-[13px] font-bold rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                                                        isSelected
+                                                            ? 'bg-gray-100 text-gray-900'
+                                                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <PriorityIcon bars={opt.bars} type={opt.label as any} />
+                                                        <span className={
+                                                            opt.label === 'High' ? 'text-red-600' :
+                                                            opt.label === 'Medium' ? 'text-amber-600' :
+                                                            'text-emerald-600'
+                                                        }>{opt.label}</span>
+                                                    </div>
+                                                    {isSelected && (
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-gray-900" />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
 
-                                    {/* Overlay to close dropdown */}
-                                    {showStatusDropdown && <div className="fixed inset-0 z-[105]" onClick={() => setShowStatusDropdown(false)} />}
-                                </>
-                            )}
+                                {showPriorityDropdown && (
+                                    <div className="fixed inset-0 z-[105]" onClick={() => setShowPriorityDropdown(false)} />
+                                )}
+                            </div>
 
+                            {/* Status Dropdown */}
+                            <div className="relative flex-shrink-0">
+                                {true && (
+                                    <>
+                                        <button
+                                            onClick={() => !isUpdatingStatus && setShowStatusDropdown(!showStatusDropdown)}
+                                            disabled={isUpdatingStatus}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-bold border transition-all whitespace-nowrap ${ticketStatus.toLowerCase() === 'closed'
+                                                ? 'bg-green-100/50 text-green-600 border-green-200/30 hover:bg-green-100'
+                                                : ticketStatus.toLowerCase() === 'spam' || ticketStatus.toLowerCase() === 'others' || ticketStatus.toLowerCase() === 'maintenance'
+                                                    ? 'bg-gray-100/50 text-gray-600 border-gray-200/30 hover:bg-gray-100'
+                                                    : 'bg-orange-100/50 text-orange-600 border-orange-200/30 hover:bg-orange-100'
+                                                } ${isUpdatingStatus ? 'opacity-70 cursor-wait' : ''}`}
+                                        >
+                                            {isUpdatingStatus ? (
+                                                <>
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                    Updating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {ticketStatus}
+                                                    <ChevronDown size={14} />
+                                                </>
+                                            )}
+                                        </button>
+
+                                        {showStatusDropdown && (
+                                            <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-xl z-[110] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                                {ticketStatus.toLowerCase() !== 'closed' && ticketStatus.toLowerCase() !== 'spam' && ticketStatus.toLowerCase() !== 'others' && ticketStatus.toLowerCase() !== 'maintenance' ? (
+                                                    <button
+                                                        onClick={() => handleStatusChange('Closed')}
+                                                        className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-green-600 hover:bg-green-50 transition-colors flex items-center justify-between"
+                                                    >
+                                                        Close Ticket
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleStatusChange('In Progress')}
+                                                        className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-orange-600 hover:bg-orange-50 transition-colors flex items-center justify-between"
+                                                    >
+                                                        Re-Open Ticket as Support
+                                                    </button>
+                                                )}
+                                                {ticketStatus.toLowerCase() !== 'spam' && (
+                                                    <button
+                                                        onClick={() => handleStatusChange('Spam')}
+                                                        className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                                                    >
+                                                        Mark as Spam
+                                                    </button>
+                                                )}
+                                                {ticketStatus.toLowerCase() !== 'others' && (
+                                                    <button
+                                                        onClick={() => handleStatusChange('Others')}
+                                                        className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                                                    >
+                                                        Mark as Others
+                                                    </button>
+                                                )}
+                                                {ticketStatus.toLowerCase() !== 'maintenance' && (
+                                                    <button
+                                                        onClick={() => handleStatusChange('Maintenance')}
+                                                        className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                                                    >
+                                                        Mark as Maintenance
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Overlay to close dropdown */}
+                                        {showStatusDropdown && <div className="fixed inset-0 z-[105]" onClick={() => setShowStatusDropdown(false)} />}
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2030,7 +2138,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
 
                 <TicketInfoSidebar
                     ticket={ticket}
-                    priority={confirmedPriority}
+                    priority={confirmedPriority || ticket.priority}
                     circuit={confirmedCircuit}
                     status={ticketStatus}
                     closedAt={closedAt}
@@ -2038,6 +2146,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                     vendorEmail={sidebarVendorEmail}
                     vendorName={vendorName}
                     onTimeZoneChangeActive={(zone) => setGlobalTimeZone(zone)}
+                    onPriorityChange={handlePriorityChange}
                 />
             </div>
 

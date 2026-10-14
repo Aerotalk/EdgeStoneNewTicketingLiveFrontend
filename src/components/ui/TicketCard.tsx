@@ -59,7 +59,10 @@ export const TicketCard: React.FC<TicketCardProps> = ({
     };
 
     return (
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div
+            onClick={onReply}
+            className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+        >
             <div className="flex items-center gap-4 mb-4">
                 <div className="w-12 h-12 rounded-full bg-[#E5DCC3] flex items-center justify-center text-[#5C5648] font-bold text-lg">
                     {getInitials(name)}
