@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../config';
 export interface Reply {
     id: string;
     text: string;
+    rawHtml?: string;
     time: string;
     date: string;
     author: string;
@@ -29,6 +30,7 @@ export interface Ticket {
     receivedAt?: string; // ISO timestamp from email
     receivedTime?: string; // Display time (24-hour format HH:MM)
     replies: Reply[];
+    attachments?: any[];
     createdAt: string;
     updatedAt: string;
     isSlaActive?: boolean;

@@ -42,7 +42,327 @@ import { useDashboardData } from '../../contexts/DashboardDataContext';
 import { GlobalClock } from '../../components/ui/GlobalClock';
 
 
-// ... (keep imports)
+// Clean HTML entity escaper
+const escapeHtml = (str: string) => {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+};
+
+const formatFileSizeHelper = (bytes?: number) => {
+    if (!bytes || isNaN(bytes)) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Reconstruct legacy 8-column flattened tables (for existing historical tickets in DB)
+const tryReconstructLegacyTable = (raw: string): string | null => {
+    if (!raw) return null;
+    const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length < 16) return null; // Needs at least 8 headers + at least 1 row of data
+
+    const headerRegexes = [
+        /^sr\s*number$/i,
+        /^sr\s*created\s*date$/i,
+        /^rfo\s*fault\s*type$/i,
+        /^srrc$/i,
+        /^vendor\s*name$/i,
+        /^vendor\s*tt\s*details$/i,
+        /^attributed\s*to$/i,
+        /^rfo\s*resou?ltion\s*comment$/i
+    ];
+
+    let headerIdx = -1;
+    for (let i = 0; i <= lines.length - 8; i++) {
+        let match = true;
+        for (let j = 0; j < 8; j++) {
+            if (!headerRegexes[j].test(lines[i + j])) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            headerIdx = i;
+            break;
+        }
+    }
+
+    if (headerIdx === -1) return null;
+
+    const headers = [
+        'SRNumber',
+        'SRCreatedDate',
+        'RFOFaultType',
+        'SRRC',
+        'Vendor Name',
+        'VendorTTDetails',
+        'AttributedTo',
+        'RFOResolutionComment'
+    ];
+
+    const beforeLines = lines.slice(0, headerIdx);
+    const dataLines = lines.slice(headerIdx + 8);
+
+    const rows: string[][] = [];
+    let curIdx = 0;
+    const afterLines: string[] = [];
+
+    while (curIdx < dataLines.length) {
+        const line0 = dataLines[curIdx];
+        const line1 = dataLines[curIdx + 1];
+
+        // Match starting line of a row (SRNumber digits and SRCreatedDate date pattern)
+        const isRowStart = /^\d{5,}/.test(line0) && line1 && /\d{1,2}\/\d{1,2}\/\d{4}/.test(line1);
+
+        if (!isRowStart) {
+            afterLines.push(...dataLines.slice(curIdx));
+            break;
+        }
+
+        if (curIdx + 7 > dataLines.length) {
+            afterLines.push(...dataLines.slice(curIdx));
+            break;
+        }
+
+        const row = [
+            dataLines[curIdx],
+            dataLines[curIdx + 1],
+            dataLines[curIdx + 2],
+            dataLines[curIdx + 3],
+            dataLines[curIdx + 4],
+            dataLines[curIdx + 5],
+            dataLines[curIdx + 6]
+        ];
+
+        let commentParts = [dataLines[curIdx + 7] || ''];
+        let scanIdx = curIdx + 8;
+        while (scanIdx < dataLines.length) {
+            const nextL0 = dataLines[scanIdx];
+            const nextL1 = dataLines[scanIdx + 1];
+            if (/^\d{5,}/.test(nextL0) && nextL1 && /\d{1,2}\/\d{1,2}\/\d{4}/.test(nextL1)) {
+                break;
+            }
+            if (/^(thanks|regards|sincerely|cheers|best|warm|support)/i.test(nextL0)) {
+                break;
+            }
+            commentParts.push(nextL0);
+            scanIdx++;
+        }
+        row.push(commentParts.join(' '));
+        rows.push(row);
+        curIdx = scanIdx;
+    }
+
+    if (rows.length === 0) return null;
+
+    const beforeHtml = beforeLines.length > 0 ? `<p class="mb-3">${beforeLines.map(escapeHtml).join('<br>')}</p>` : '';
+    const afterHtml = afterLines.length > 0 ? `<p class="mt-3">${afterLines.map(escapeHtml).join('<br>')}</p>` : '';
+
+    const tableRowsHtml = rows.map(r => `
+        <tr>
+            <td style="font-weight: 700; color: #b91c1c;">${escapeHtml(r[0])}</td>
+            <td style="color: #b91c1c; white-space: nowrap;">${escapeHtml(r[1])}</td>
+            <td style="color: #b91c1c;">${escapeHtml(r[2])}</td>
+            <td style="color: #b91c1c;">${escapeHtml(r[3])}</td>
+            <td style="font-weight: 500;">${escapeHtml(r[4])}</td>
+            <td style="font-family: monospace; font-weight: 600;">${escapeHtml(r[5])}</td>
+            <td>${escapeHtml(r[6])}</td>
+            <td style="max-width: 450px; font-size: 12px; line-height: 1.45;">${escapeHtml(r[7])}</td>
+        </tr>
+    `).join('');
+
+    return `
+        ${beforeHtml}
+        <div class="edgestone-table-container">
+            <table class="edgestone-table">
+                <thead>
+                    <tr style="background-color: #fef08a; border-bottom: 2px solid #eab308;">
+                        ${headers.map(h => `<th style="background-color: #fef08a; color: #854d0e; font-weight: 700; border: 1px solid #fde047;">${h}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRowsHtml}
+                </tbody>
+            </table>
+        </div>
+        ${afterHtml}
+    `;
+};
+
+// Wrap unwrapped HTML tables and inject table classes
+const enhanceHtmlTables = (html: string): string => {
+    let output = html;
+    output = output.replace(/<table(?!\s+class=['"][^'"]*edgestone-table)/gi, '<table class="edgestone-table"');
+    if (!output.includes('edgestone-table-container')) {
+        output = output.replace(/(<table[\s\S]*?<\/table>)/gi, '<div class="edgestone-table-container">$1</div>');
+    }
+    return output;
+};
+
+// Universal Message Body Renderer for HTML Tables, Legacy Flattened Tables, and Plain Text
+const MessageBodyRenderer: React.FC<{ text?: string; rawHtml?: string }> = ({ text, rawHtml }) => {
+    const content = useMemo(() => {
+        if (!text && !rawHtml) {
+            return { type: 'empty' };
+        }
+
+        const candidate = rawHtml || text || '';
+
+        // 1. If HTML table exists
+        if (/<table[\s>]/i.test(candidate)) {
+            return {
+                type: 'html',
+                html: enhanceHtmlTables(candidate)
+            };
+        }
+
+        // 2. If legacy flattened 8-header table
+        const reconstructed = tryReconstructLegacyTable(text || '');
+        if (reconstructed) {
+            return {
+                type: 'html',
+                html: reconstructed
+            };
+        }
+
+        // 3. If formatted HTML
+        if (/<(p|br|div|span|b|strong|i|em|ul|ol|li|a)\b[^>]*>/i.test(candidate)) {
+            return {
+                type: 'html',
+                html: candidate
+            };
+        }
+
+        // 4. Default plain text
+        return {
+            type: 'text',
+            text: text || ''
+        };
+    }, [text, rawHtml]);
+
+    if (content.type === 'empty') {
+        return <p className="italic text-gray-400">No message content available</p>;
+    }
+
+    if (content.type === 'html') {
+        return (
+            <div
+                className="text-[14px] text-gray-700 leading-relaxed font-normal space-y-3 break-words prose max-w-none [&_table]:my-2"
+                dangerouslySetInnerHTML={{ __html: content.html || '' }}
+            />
+        );
+    }
+
+    return (
+        <div className="text-[14px] text-gray-600 leading-relaxed font-medium whitespace-pre-wrap break-words">
+            {content.text}
+        </div>
+    );
+};
+
+// Reusable Attachment Item Renderer with specific support and badge for attached email items (.eml/.msg)
+const AttachmentItemRenderer: React.FC<{ att: any; index: number }> = ({ att, index }) => {
+    const fileName = att.originalName || att.filename || att.name || 'Attachment';
+    const isLegacy = !att.url && att.contentBytes;
+    const isExceeded = !!att.exceededLimit || !!att.error;
+    const isEmailAttachment = fileName.toLowerCase().endsWith('.eml') ||
+        fileName.toLowerCase().endsWith('.msg') ||
+        att.mimeType === 'message/rfc822' ||
+        att.contentType === 'message/rfc822';
+    const apiBase = API_BASE_URL;
+
+    let downloadUrl = '#';
+    if (att.filename) {
+        downloadUrl = `${apiBase}/api/upload/attachments/${encodeURIComponent(att.filename)}/download?name=${encodeURIComponent(fileName)}`;
+    } else if (att.downloadUrl) {
+        downloadUrl = att.downloadUrl.startsWith('http://localhost:5000') && apiBase
+            ? att.downloadUrl.replace('http://localhost:5000', apiBase)
+            : (att.downloadUrl.startsWith('/') ? `${apiBase}${att.downloadUrl}` : att.downloadUrl);
+    } else if (att.url) {
+        downloadUrl = att.url.startsWith('http://localhost:5000') && apiBase
+            ? att.url.replace('http://localhost:5000', apiBase)
+            : (att.url.startsWith('/') ? `${apiBase}${att.url}` : att.url);
+    }
+
+    const handleDownload = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (isExceeded) {
+            alert(`Unable to download: ${att.error || 'File exceeded system size limit of 25MB'}`);
+            return;
+        }
+
+        if (isLegacy) {
+            const link = document.createElement('a');
+            link.href = `data:${att.mimeType || 'application/octet-stream'};base64,${att.contentBytes}`;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+        }
+
+        // Stream large files via browser native download
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = fileName;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    return (
+        <div key={index} className="flex items-center gap-2">
+            <button
+                type="button"
+                onClick={handleDownload}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all text-left group ${
+                    isExceeded 
+                        ? 'bg-red-50/70 border-red-200 text-red-600 cursor-not-allowed' 
+                        : isEmailAttachment
+                            ? 'bg-amber-50/70 border-amber-200 hover:bg-amber-100/70 text-gray-800 cursor-pointer shadow-sm'
+                            : 'bg-gray-50 border-gray-100 hover:bg-orange-50/50 hover:border-orange-200 text-gray-700 cursor-pointer shadow-sm'
+                }`}
+                title={isExceeded ? att.error : `Click to download ${fileName}`}
+            >
+                {isEmailAttachment ? (
+                    <Mail size={15} className={isExceeded ? 'text-red-400' : 'text-amber-600 group-hover:text-amber-700 flex-shrink-0'} />
+                ) : (
+                    <Paperclip size={14} className={isExceeded ? 'text-red-400' : 'text-gray-400 group-hover:text-orange-500 flex-shrink-0'} />
+                )}
+                <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                        <span className={`text-[13px] font-medium max-w-[260px] truncate ${isExceeded ? 'text-red-700 line-through' : isEmailAttachment ? 'text-amber-900 group-hover:text-amber-950 font-semibold group-hover:underline' : 'text-blue-600 group-hover:text-orange-600 group-hover:underline'}`}>
+                            {fileName}
+                        </span>
+                        {isEmailAttachment && (
+                            <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
+                                Attached Email
+                            </span>
+                        )}
+                        {att.size && (
+                            <span className="text-[10px] text-gray-400 font-semibold bg-gray-100 px-1.5 py-0.5 rounded">
+                                {formatFileSizeHelper(att.size)}
+                            </span>
+                        )}
+                    </div>
+                    {isExceeded ? (
+                        <span className="text-[11px] text-red-500 font-medium">⚠️ {att.error}</span>
+                    ) : (
+                        <span className={`text-[10px] flex items-center gap-1 ${isEmailAttachment ? 'text-amber-700 group-hover:text-amber-800 font-medium' : 'text-gray-400 group-hover:text-orange-500'}`}>
+                            <Download size={10} /> {isEmailAttachment ? 'Click to open / download attached email' : 'Click to download'}
+                        </span>
+                    )}
+                </div>
+            </button>
+        </div>
+    );
+};
 
 interface UITicket extends Ticket {
     name: string;
@@ -1493,10 +1813,18 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                             </div>
                                         </div>
 
-                                        <div className="text-[14px] text-gray-600 leading-relaxed font-medium space-y-4 whitespace-pre-wrap break-all">
-                                            {replies.length > 0 && replies[0].type === 'client'
-                                                ? replies[0].text
-                                                : 'No message content available'}
+                                        <div className="text-[14px] text-gray-600 leading-relaxed font-medium space-y-4 break-words">
+                                            <MessageBodyRenderer
+                                                text={replies.length > 0 && replies[0].type === 'client' ? replies[0].text : 'No message content available'}
+                                                rawHtml={replies.length > 0 && replies[0].type === 'client' ? replies[0].rawHtml : undefined}
+                                            />
+                                            {((replies.length > 0 && replies[0].attachments && replies[0].attachments.length > 0) || (ticket.attachments && ticket.attachments.length > 0)) && (
+                                                <div className="mt-3 flex flex-col gap-2">
+                                                    {((replies.length > 0 && replies[0].attachments && replies[0].attachments.length > 0) ? replies[0].attachments : (ticket.attachments || [])).map((att: any, idx: number) => (
+                                                        <AttachmentItemRenderer key={idx} att={att} index={idx} />
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="absolute left-[-17px] top-5 w-4 h-4 bg-white border-l border-b border-gray-100 rotate-45"></div>
                                     </div>
@@ -1640,94 +1968,14 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                             </div>
                                         </div>
 
-                                        <div className="text-[14px] text-gray-600 leading-relaxed font-medium whitespace-pre-wrap break-words">
-                                            {reply.text}
+                                        <div className="text-[14px] text-gray-600 leading-relaxed font-medium break-words">
+                                            <MessageBodyRenderer text={reply.text} rawHtml={reply.rawHtml} />
                                         </div>
                                         {reply.attachments && reply.attachments.length > 0 && (
                                             <div className="mt-3 flex flex-col gap-2">
-                                                {reply.attachments.map((att: any, idx: number) => {
-                                                    const fileName = att.originalName || att.filename || att.name || 'Attachment';
-                                                    const isLegacy = !att.url && att.contentBytes;
-                                                    const isExceeded = !!att.exceededLimit || !!att.error;
-                                                    const apiBase = API_BASE_URL;
-
-                                                    let downloadUrl = '#';
-                                                    if (att.filename) {
-                                                        downloadUrl = `${apiBase}/api/upload/attachments/${encodeURIComponent(att.filename)}/download?name=${encodeURIComponent(fileName)}`;
-                                                    } else if (att.downloadUrl) {
-                                                        downloadUrl = att.downloadUrl.startsWith('http://localhost:5000') && apiBase
-                                                            ? att.downloadUrl.replace('http://localhost:5000', apiBase)
-                                                            : (att.downloadUrl.startsWith('/') ? `${apiBase}${att.downloadUrl}` : att.downloadUrl);
-                                                    } else if (att.url) {
-                                                        downloadUrl = att.url.startsWith('http://localhost:5000') && apiBase
-                                                            ? att.url.replace('http://localhost:5000', apiBase)
-                                                            : (att.url.startsWith('/') ? `${apiBase}${att.url}` : att.url);
-                                                    }
-
-                                                    const handleDownload = (e: React.MouseEvent) => {
-                                                        e.preventDefault();
-                                                        if (isExceeded) {
-                                                            alert(`Unable to download: ${att.error || 'File exceeded system size limit of 25MB'}`);
-                                                            return;
-                                                        }
-
-                                                        if (isLegacy) {
-                                                            const link = document.createElement('a');
-                                                            link.href = `data:${att.mimeType || 'application/octet-stream'};base64,${att.contentBytes}`;
-                                                            link.download = fileName;
-                                                            document.body.appendChild(link);
-                                                            link.click();
-                                                            document.body.removeChild(link);
-                                                            return;
-                                                        }
-
-                                                        // Stream large files via browser native download
-                                                        const link = document.createElement('a');
-                                                        link.href = downloadUrl;
-                                                        link.download = fileName;
-                                                        link.target = '_blank';
-                                                        link.rel = 'noopener noreferrer';
-                                                        document.body.appendChild(link);
-                                                        link.click();
-                                                        document.body.removeChild(link);
-                                                    };
-
-                                                    return (
-                                                        <div key={idx} className="flex items-center gap-2">
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleDownload}
-                                                                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all text-left group ${
-                                                                    isExceeded 
-                                                                        ? 'bg-red-50/70 border-red-200 text-red-600 cursor-not-allowed' 
-                                                                        : 'bg-gray-50 border-gray-100 hover:bg-orange-50/50 hover:border-orange-200 text-gray-700 cursor-pointer shadow-sm'
-                                                                }`}
-                                                                title={isExceeded ? att.error : `Click to download ${fileName}`}
-                                                            >
-                                                                <Paperclip size={14} className={isExceeded ? 'text-red-400' : 'text-gray-400 group-hover:text-orange-500'} />
-                                                                <div className="flex flex-col">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className={`text-[13px] font-medium max-w-[260px] truncate ${isExceeded ? 'text-red-700 line-through' : 'text-blue-600 group-hover:text-orange-600 group-hover:underline'}`}>
-                                                                            {fileName}
-                                                                        </span>
-                                                                        {att.size && (
-                                                                            <span className="text-[10px] text-gray-400 font-semibold bg-gray-100 px-1.5 py-0.5 rounded">
-                                                                                {formatFileSize(att.size)}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                    {isExceeded ? (
-                                                                        <span className="text-[11px] text-red-500 font-medium">⚠️ {att.error}</span>
-                                                                    ) : (
-                                                                        <span className="text-[10px] text-gray-400 flex items-center gap-1 group-hover:text-orange-500">
-                                                                            <Download size={10} /> Click to download
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })}
+                                                {reply.attachments.map((att: any, idx: number) => (
+                                                    <AttachmentItemRenderer key={idx} att={att} index={idx} />
+                                                ))}
                                             </div>
                                         )}
                                         <div className="absolute left-[-17px] top-5 w-4 h-4 bg-white border-l border-b border-gray-100 rotate-45"></div>

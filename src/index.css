@@ -48,4 +48,46 @@
     .sla-dynamic-scrollbar::-webkit-scrollbar-thumb:hover {
         background: rgba(229, 48, 59, 0.6);
     }
+
+    /* Clean, modern styling for tables in email conversation threads */
+    .edgestone-table-container {
+        width: 100%;
+        overflow-x: auto;
+        margin: 14px 0;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+    .edgestone-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        text-align: left;
+        line-height: 1.5;
+    }
+    .edgestone-table th {
+        background-color: #f8fafc;
+        color: #1e293b;
+        font-weight: 700;
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        white-space: nowrap;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+    }
+    .edgestone-table td {
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        color: #334155;
+        vertical-align: top;
+        font-size: 13px;
+    }
+    .edgestone-table tr:nth-child(even) td {
+        background-color: #fafbfc;
+    }
+    .edgestone-table tr:hover td {
+        background-color: #f1f5f9;
+    }
 }
