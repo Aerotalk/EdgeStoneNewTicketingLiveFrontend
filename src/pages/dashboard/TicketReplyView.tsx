@@ -11,7 +11,6 @@ import {
     User,
     X,
     Send,
-    Eye,
     Paperclip,
     Plus,
     Minus,
@@ -28,6 +27,7 @@ import { API_BASE_URL } from '../../config';
 import { NotificationDropdown } from '../../components/ui/NotificationDropdown';
 import { DeleteConfirmModal } from '../../components/ui/DeleteConfirmModal';
 import { EmailRecipientAutocomplete } from '../../components/ui/EmailRecipientAutocomplete';
+import { RichMailComposer } from '../../components/ui/RichMailComposer';
 
 import { ticketService, type Reply, type Ticket } from '../../services/ticketService';
 import { signatureService, type Signature } from '../../services/signatureService';
@@ -203,6 +203,41 @@ const enhanceHtmlTables = (html: string): string => {
     return output;
 };
 
+// Outlook Message Enhancer: Highlights @mentions as blue pills and styles Outlook quoted history blocks
+const enhanceOutlookFormatting = (html: string): string => {
+    if (!html) return '';
+    let formatted = html;
+
+    // 1. Outlook Mention Badges: @username (e.g. @rajeshkj in reference screenshot)
+    formatted = formatted.replace(
+        /(^|[\s>(])@([a-zA-Z0-9_.-]+)(?=[\s<.,!?:;)"]|$)/g,
+        '$1<span class="inline-flex items-center px-2 py-0.5 rounded text-[13px] font-semibold bg-[#e0f2fe] text-[#0369a1] border border-[#bae6fd]/60">@$2</span>'
+    );
+
+    // 2. Outlook OWA mention links: <a id="OWAAME..." ...>@Name</a> or mailto with @
+    formatted = formatted.replace(
+        /<a\b([^>]*\bid=["']?OWAAME[^"']*["']?[^>]*)>(.*?)<\/a>/gi,
+        '<span class="inline-flex items-center px-2 py-0.5 rounded text-[13px] font-semibold bg-[#e0f2fe] text-[#0369a1] border border-[#bae6fd]/60">$2</span>'
+    );
+
+    // 3. Outlook Quoted Email Headers (Screenshot 2: From, Sent, To, Cc, Subject)
+    formatted = formatted.replace(
+        /(?:<p>|<br\s*\/?>)?\s*(?:<b>From:<\/b>|From:)\s*([^<]+)<br\s*\/?>\s*(?:<b>Sent:<\/b>|Sent:)\s*([^<]+)<br\s*\/?>\s*(?:<b>To:<\/b>|To:)\s*([^<]+)(?:<br\s*\/?>\s*(?:<b>Cc:<\/b>|Cc:)\s*([^<]+))?<br\s*\/?>\s*(?:<b>Subject:<\/b>|Subject:)\s*([^<]+)/gi,
+        (_, fromVal, sentVal, toVal, ccVal, subjVal) => {
+            return `
+            <div class="mt-6 pt-4 border-t border-gray-200/90 text-[13px] text-gray-700 bg-gray-50/70 p-4 rounded-xl space-y-1">
+                <div><b class="text-gray-900 font-bold">From:</b> ${fromVal.trim()}</div>
+                <div><b class="text-gray-900 font-bold">Sent:</b> ${sentVal.trim()}</div>
+                <div><b class="text-gray-900 font-bold">To:</b> ${toVal.trim()}</div>
+                ${ccVal ? `<div><b class="text-gray-900 font-bold">Cc:</b> ${ccVal.trim()}</div>` : ''}
+                <div><b class="text-gray-900 font-bold">Subject:</b> ${subjVal.trim()}</div>
+            </div>`;
+        }
+    );
+
+    return formatted;
+};
+
 // Universal Message Body Renderer for HTML Tables, Legacy Flattened Tables, and Plain Text
 const MessageBodyRenderer: React.FC<{ text?: string; rawHtml?: string }> = ({ text, rawHtml }) => {
     const content = useMemo(() => {
@@ -216,7 +251,7 @@ const MessageBodyRenderer: React.FC<{ text?: string; rawHtml?: string }> = ({ te
         if (/<table[\s>]/i.test(candidate)) {
             return {
                 type: 'html',
-                html: enhanceHtmlTables(candidate)
+                html: enhanceOutlookFormatting(enhanceHtmlTables(candidate))
             };
         }
 
@@ -225,7 +260,7 @@ const MessageBodyRenderer: React.FC<{ text?: string; rawHtml?: string }> = ({ te
         if (reconstructed) {
             return {
                 type: 'html',
-                html: reconstructed
+                html: enhanceOutlookFormatting(reconstructed)
             };
         }
 
@@ -233,14 +268,14 @@ const MessageBodyRenderer: React.FC<{ text?: string; rawHtml?: string }> = ({ te
         if (/<(p|br|div|span|b|strong|i|em|ul|ol|li|a)\b[^>]*>/i.test(candidate)) {
             return {
                 type: 'html',
-                html: candidate
+                html: enhanceOutlookFormatting(candidate)
             };
         }
 
-        // 4. Default plain text
+        // 4. Default plain text (convert newlines and enhance mentions)
         return {
-            type: 'text',
-            text: text || ''
+            type: 'html',
+            html: enhanceOutlookFormatting(escapeHtml(text || '').replace(/\n/g, '<br>'))
         };
     }, [text, rawHtml]);
 
@@ -248,19 +283,11 @@ const MessageBodyRenderer: React.FC<{ text?: string; rawHtml?: string }> = ({ te
         return <p className="italic text-gray-400">No message content available</p>;
     }
 
-    if (content.type === 'html') {
-        return (
-            <div
-                className="text-[14px] text-gray-700 leading-relaxed font-normal space-y-3 break-words prose max-w-none [&_table]:my-2"
-                dangerouslySetInnerHTML={{ __html: content.html || '' }}
-            />
-        );
-    }
-
     return (
-        <div className="text-[14px] text-gray-600 leading-relaxed font-medium whitespace-pre-wrap break-words">
-            {content.text}
-        </div>
+        <div
+            className="text-[14.5px] text-[#0f172a] leading-relaxed font-normal space-y-3 break-words prose max-w-none [&_table]:my-2"
+            dangerouslySetInnerHTML={{ __html: content.html || '' }}
+        />
     );
 };
 
@@ -447,6 +474,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
     });
     const [openDropdown, setOpenDropdown] = useState<'circuit' | 'priority' | null>(null);
     const [replyText, setReplyText] = useState('');
+    const [replyHtml, setReplyHtml] = useState('');
     const [showEmailModal, setShowEmailModal] = useState(false);
     const [replies, setReplies] = useState<Reply[]>([]);
     const [attachments, setAttachments] = useState<File[]>([]);
@@ -1359,18 +1387,19 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
 
 
     const handleSendReply = async () => {
-        if (!replyText.trim() && !signatureHtml && attachments.length === 0) return;
+        const hasContent = replyHtml.trim() || replyText.trim() || signatureHtml || attachments.length > 0;
+        if (!hasContent) return;
 
         // ── Build the plain-text body ──
-        const plainBody = replyText.trim();
+        const plainBody = replyText.trim() || replyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
         // ── Build the full HTML email body ────────────────────────────
-        // Message body → convert newlines to <br> tags, escape HTML
-        const htmlBody = plainTextToHtml(plainBody);
+        // If rich HTML is provided, use it directly (preserving tables, fonts, bold, etc.)
+        const htmlBody = replyHtml.trim() ? replyHtml : plainTextToHtml(plainBody);
         const htmlSignature = signatureHtml
-            ? `<br><br><div style="border-top:1px solid #e0e0e0;margin-top:16px;padding-top:12px;">${signatureHtml}</div>`
+            ? `<br><br><div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:12px;">${signatureHtml}</div>`
             : '';
-        const fullHtmlContent = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.6;">${htmlBody}${htmlSignature}</div>`;
+        const fullHtmlContent = `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#0f172a;line-height:1.6;">${htmlBody}${htmlSignature}</div>`;
 
         try {
             setIsSending(true);
@@ -1416,6 +1445,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
 
             // Clear form
             setReplyText('');
+            setReplyHtml('');
             setAttachments([]);
             setEmailForm(prev => ({
                 ...prev,
@@ -2035,62 +2065,107 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                     {activeTab === 'client' && ticket.ticketType !== 'Vendor' && <div className="ml-5 border-l-2 border-gray-100 py-1"></div>}
 
                     {replies.filter(r => isReplyForTab(r, activeTab, ticketCircuit)).map((reply, idx) => (
-                        <div key={idx} className="flex flex-col">
-                            <div className="flex gap-4">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0 ${reply.type === 'agent' ? 'bg-orange-500 text-white' :
-                                    reply.type === 'client' ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'
-                                    }`}>
-                                    {reply.author[0].toUpperCase()}
-                                </div>
-                                <div className="flex-1">
-                                    <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm relative">
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="space-y-0.5">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[15px] font-bold text-gray-900">{reply.author}</span>
-                                                    <span className="text-[14px] text-gray-400 font-medium">
-                                                        &lt;{reply.type === 'agent' ? 'support@edgestone.in' : (reply.to && reply.to.length > 0 ? reply.to[0] : (reply.type === 'client' ? ticket.email : 'vendor@example.com'))}&gt;
-                                                    </span>
-                                                </div>
-                                                <div className="flex flex-col gap-0.5">
-                                                    <p className="text-[12px] text-gray-400 font-medium">
-                                                        To: {reply.type === 'agent'
-                                                            ? (reply.to?.join(', ') || (activeTab === 'client' ? ticket.email : 'Vendor NOC'))
-                                                            : (() => {
-                                                                const extraTos = (reply.to || []).slice(1).filter(e => e && e.toLowerCase() !== 'support@edgestone.in');
-                                                                return extraTos.length > 0
-                                                                    ? `support@edgestone.in, ${extraTos.join(', ')}`
-                                                                    : 'support@edgestone.in';
-                                                            })()}
-                                                    </p>
-                                                    {reply.cc && reply.cc.length > 0 && (
-                                                        <p className="text-[11px] text-gray-400 font-medium">Cc: {reply.cc.join(', ')}</p>
-                                                    )}
-                                                </div>
+                        <div key={idx} className="flex flex-col mb-4">
+                            <div className="bg-white border border-gray-200/90 rounded-2xl p-6 shadow-2xs relative transition-all hover:border-gray-300">
+                                {/* Outlook-Style Reading Header */}
+                                <div className="flex items-start justify-between gap-4 pb-4 border-b border-gray-100">
+                                    <div className="flex items-start gap-3.5">
+                                        {/* Avatar (EdgeStone ES for agents, circular badge for clients/vendors) */}
+                                        {reply.type === 'agent' ? (
+                                            <div className="w-10 h-10 rounded-full bg-slate-900 border border-gray-200 flex items-center justify-center text-white font-extrabold text-[12px] shadow-2xs flex-shrink-0">
+                                                <span className="text-orange-400">E</span><span>S</span>
                                             </div>
-                                            <div className="flex items-center gap-4 text-gray-400">
-                                                <span className="text-[13px] font-medium">{reply.createdAt ? `${formatDateWithTZ(reply.createdAt, globalTimeZone, { day: 'numeric', month: 'short', year: 'numeric' })} • ${formatTimeWithTZ(reply.createdAt, globalTimeZone)} hrs` : `${reply.date} • ${reply.time}`}</span>
-                                                <div className="flex items-center gap-2.5">
-                                                    <button className="hover:text-gray-600"><MoreVertical size={16} /></button>
-                                                </div>
+                                        ) : reply.type === 'client' ? (
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700 font-bold text-[13px] shadow-2xs flex-shrink-0">
+                                                {(reply.author || 'C')[0]?.toUpperCase()}
                                             </div>
-                                        </div>
-
-                                        <div className="text-[14px] text-gray-600 leading-relaxed font-medium break-words">
-                                            <MessageBodyRenderer text={reply.text} rawHtml={reply.rawHtml} />
-                                        </div>
-                                        {reply.attachments && reply.attachments.length > 0 && (
-                                            <div className="mt-3 flex flex-col gap-2">
-                                                {reply.attachments.map((att: any, idx: number) => (
-                                                    <AttachmentItemRenderer key={idx} att={att} index={idx} />
-                                                ))}
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold text-[13px] shadow-2xs flex-shrink-0">
+                                                {(reply.author || 'V')[0]?.toUpperCase()}
                                             </div>
                                         )}
-                                        <div className="absolute left-[-17px] top-5 w-4 h-4 bg-white border-l border-b border-gray-100 rotate-45"></div>
+
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-[15px] font-bold text-gray-900 leading-tight">{reply.author}</span>
+                                                <span className="text-[13px] text-gray-400 font-medium">
+                                                    &lt;{reply.type === 'agent' ? 'support@edgestone.in' : (reply.to && reply.to.length > 0 ? reply.to[0] : (reply.type === 'client' ? ticket.email : 'vendor@example.com'))}&gt;
+                                                </span>
+                                            </div>
+
+                                            {/* Outlook-Style To: line with circular indicators */}
+                                            <div className="flex items-center gap-1.5 text-[12.5px] text-gray-600 flex-wrap">
+                                                <span className="text-gray-400 font-medium w-5">To</span>
+                                                {(() => {
+                                                    const tos = reply.type === 'agent'
+                                                        ? (reply.to?.length ? reply.to : [activeTab === 'client' ? ticket.email : 'Vendor NOC'])
+                                                        : ['support@edgestone.in', ...((reply.to || []).slice(1).filter((e: string) => e && e.toLowerCase() !== 'support@edgestone.in'))];
+                                                    return tos.map((rec: string, i: number) => (
+                                                        <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 border border-gray-200/60 text-gray-700 rounded-full text-[12px]">
+                                                            <span className="w-1.5 h-1.5 rounded-full border border-gray-400 bg-white"></span>
+                                                            {rec}
+                                                        </span>
+                                                    ));
+                                                })()}
+                                            </div>
+
+                                            {/* Outlook-Style Cc: line with circular indicators */}
+                                            {reply.cc && reply.cc.length > 0 && (
+                                                <div className="flex items-center gap-1.5 text-[12.5px] text-gray-500 flex-wrap">
+                                                    <span className="text-gray-400 font-medium w-5">Cc</span>
+                                                    {reply.cc.map((ccEmail: string, i: number) => (
+                                                        <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 border border-gray-200/60 text-gray-600 rounded-full text-[12px]">
+                                                            <span className="w-1.5 h-1.5 rounded-full border border-gray-400 bg-white"></span>
+                                                            {ccEmail}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Right Side: Quick Outlook Actions & Timestamp */}
+                                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                        <div className="flex items-center gap-1 bg-gray-50 border border-gray-200/80 rounded-xl p-1 shadow-2xs">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowEmailModal(true)}
+                                                className="flex items-center gap-1.5 px-2.5 py-1 text-gray-700 hover:text-gray-900 hover:bg-white rounded-lg text-xs font-semibold transition-all shadow-2xs border border-transparent hover:border-gray-200/80"
+                                                title="Reply"
+                                            >
+                                                <CornerUpLeft size={13} className="text-blue-600" />
+                                                <span>Reply</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowEmailModal(true)}
+                                                className="flex items-center gap-1.5 px-2.5 py-1 text-gray-700 hover:text-gray-900 hover:bg-white rounded-lg text-xs font-semibold transition-all shadow-2xs border border-transparent hover:border-gray-200/80"
+                                                title="Reply All"
+                                            >
+                                                <ReplyIcon size={13} className="text-purple-600" />
+                                                <span>Reply All</span>
+                                            </button>
+                                        </div>
+                                        <span className="text-[12px] text-gray-400 font-medium">
+                                            {reply.createdAt ? `${formatDateWithTZ(reply.createdAt, globalTimeZone, { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })} ${formatTimeWithTZ(reply.createdAt, globalTimeZone)}` : `${reply.date} • ${reply.time}`}
+                                        </span>
                                     </div>
                                 </div>
+
+                                {/* Email Body with Outlook typography */}
+                                <div className="pt-4 text-[14.5px] text-[#0f172a] leading-relaxed font-normal break-words">
+                                    <MessageBodyRenderer text={reply.text} rawHtml={reply.rawHtml} />
+                                </div>
+
+                                {/* Attachments */}
+                                {reply.attachments && reply.attachments.length > 0 && (
+                                    <div className="mt-4 pt-3 border-t border-gray-100 flex flex-wrap gap-2">
+                                        {reply.attachments.map((att: any, attIdx: number) => (
+                                            <AttachmentItemRenderer key={attIdx} att={att} index={attIdx} />
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            <div className="ml-5 border-l-2 border-gray-100 py-1"></div>
                         </div>
                     ))}
 
@@ -2372,22 +2447,19 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                 </div>
                             </div>
 
-                            {/* Message Area */}
-                            <div className="relative group flex flex-col bg-white border border-gray-100 rounded-[24px] focus-within:border-gray-900/10 focus-within:ring-4 focus-within:ring-gray-900/5 transition-all shadow-inner overflow-hidden min-h-[220px]">
-                                <textarea
-                                    value={replyText}
-                                    onChange={(e) => setReplyText(e.target.value)}
-                                    placeholder="Type your message here..."
-                                    className="w-full min-h-[120px] flex-1 p-6 text-[15px] font-medium text-gray-700 placeholder:text-gray-300 focus:outline-none resize-none bg-transparent"
+                            {/* Outlook-Grade Rich Mail Composer */}
+                            <div className="flex flex-col bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs">
+                                <RichMailComposer
+                                    valueHtml={replyHtml}
+                                    onChange={(html, plainText) => {
+                                        setReplyHtml(html);
+                                        setReplyText(plainText);
+                                    }}
+                                    placeholder="Type your message here... (You can paste tables directly from Outlook, Excel, or Word)"
+                                    signatureHtml={signatureHtml}
+                                    minHeight="200px"
                                     autoFocus
                                 />
-
-                                {signatureHtml && (
-                                    <div
-                                        className="px-6 pb-4 pt-0 text-[14px] text-gray-600 border-t border-gray-50/50 mt-2 pt-4"
-                                        dangerouslySetInnerHTML={{ __html: signatureHtml }}
-                                    />
-                                )}
 
                                 <input
                                     type="file"
@@ -2397,20 +2469,17 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                     multiple
                                 />
 
-                                <div className="flex items-center gap-3 px-6 py-3.5 bg-gray-50/50 border-t border-gray-100/80 flex-shrink-0">
+                                <div className="flex items-center gap-3 px-5 py-3 bg-gray-50/80 border-t border-gray-200 flex-shrink-0">
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="px-2.5 py-1.5 text-gray-500 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-all flex items-center gap-2 border border-gray-200/60 bg-white shadow-2xs"
+                                        className="px-3 py-1.5 text-gray-600 hover:text-orange-600 hover:bg-white rounded-lg transition-all flex items-center gap-2 border border-gray-200 bg-white/90 shadow-2xs text-[12px] font-semibold"
                                         title="Attach files (Max 20MB per file, up to 10 files)"
                                     >
-                                        <Paperclip size={16} />
-                                        <span className="text-[12px] font-medium">Attach files</span>
-                                        <span className="text-[10px] text-gray-400 font-normal">(Max 20MB)</span>
-                                        {attachments.length > 0 && <span className="text-[11px] font-bold text-orange-600 bg-orange-100/80 px-1.5 py-0.5 rounded-full">{attachments.length}/10</span>}
-                                    </button>
-                                    <button className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">
-                                        <Eye size={18} />
+                                        <Paperclip size={14} />
+                                        <span>Attach files</span>
+                                        <span className="text-[11px] text-gray-400 font-normal">(Max 20MB)</span>
+                                        {attachments.length > 0 && <span className="text-[11px] font-bold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full">{attachments.length}/10</span>}
                                     </button>
                                 </div>
                             </div>
@@ -2511,7 +2580,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                 </button>
                                 <button
                                     onClick={handleSendReply}
-                                    disabled={(!replyText.trim() && !signatureHtml && attachments.length === 0) || isSending || !(emailForm.subject.trim() || getLockedSubject(activeTab))}
+                                    disabled={(!replyHtml.trim() && !replyText.trim() && !signatureHtml && attachments.length === 0) || isSending || !(emailForm.subject.trim() || getLockedSubject(activeTab))}
                                     className="flex items-center gap-2.5 px-8 py-3 bg-orange-500 text-white rounded-xl text-[15px] font-bold hover:bg-orange-600 transition-all active:scale-[0.98] shadow-[0_20px_40px_-12px_rgba(249,115,22,0.3)] disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed group"
                                 >
                                     <span>{isSending ? 'Sending...' : 'Send Message'}</span>
