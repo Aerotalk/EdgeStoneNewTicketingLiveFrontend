@@ -285,7 +285,7 @@ const MessageBodyRenderer: React.FC<{ text?: string; rawHtml?: string }> = ({ te
 
     return (
         <div
-            className="text-[14.5px] text-[#0f172a] leading-relaxed font-normal space-y-3 break-words prose max-w-none [&_table]:my-2"
+            className="text-[14px] text-gray-700 leading-relaxed font-normal space-y-3 break-words [&_table]:my-2"
             dangerouslySetInnerHTML={{ __html: content.html || '' }}
         />
     );
@@ -2065,108 +2065,79 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                     {activeTab === 'client' && ticket.ticketType !== 'Vendor' && <div className="ml-5 border-l-2 border-gray-100 py-1"></div>}
 
                     {replies.filter(r => isReplyForTab(r, activeTab, ticketCircuit)).map((reply, idx) => (
-                        <div key={idx} className="flex flex-col mb-4">
-                            <div className="bg-white border border-gray-200/90 rounded-2xl p-6 shadow-2xs relative transition-all hover:border-gray-300">
-                                {/* Outlook-Style Reading Header */}
-                                <div className="flex items-start justify-between gap-4 pb-4 border-b border-gray-100">
-                                    <div className="flex items-start gap-3.5">
-                                        {/* Avatar (EdgeStone ES for agents, circular badge for clients/vendors) */}
-                                        {reply.type === 'agent' ? (
-                                            <div className="w-10 h-10 rounded-full bg-slate-900 border border-gray-200 flex items-center justify-center text-white font-extrabold text-[12px] shadow-2xs flex-shrink-0">
-                                                <span className="text-orange-400">E</span><span>S</span>
+                        <React.Fragment key={idx}>
+                            <div className="flex gap-4 group">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0 ${
+                                    reply.type === 'agent'
+                                        ? 'bg-orange-100 text-orange-600'
+                                        : reply.type === 'vendor'
+                                            ? 'bg-purple-100 text-purple-600'
+                                            : 'bg-indigo-100 text-indigo-600'
+                                }`}>
+                                    {reply.type === 'agent'
+                                        ? 'ES'
+                                        : (reply.author ? reply.author.slice(0, 2).toUpperCase() : 'CL')}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm relative hover:border-gray-200 transition-all">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="space-y-0.5">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="text-[15px] font-bold text-gray-900">{reply.author}</span>
+                                                    <span className="text-[14px] text-gray-400 font-medium">
+                                                        &lt;{reply.type === 'agent'
+                                                            ? 'support@edgestone.in'
+                                                            : (reply.to && reply.to.length > 0 && reply.to[0] !== 'support@edgestone.in'
+                                                                ? reply.to[0]
+                                                                : (reply.type === 'client' ? ticket.email : 'vendor@example.com'))}&gt;
+                                                    </span>
+                                                </div>
+                                                <p className="text-[13px] text-gray-400 font-medium">
+                                                    To: {reply.type === 'agent'
+                                                        ? (reply.to?.length ? reply.to.join(', ') : (activeTab === 'client' ? ticket.email : 'Vendor NOC'))
+                                                        : 'support@edgestone.in'}
+                                                </p>
+                                                {reply.cc && reply.cc.length > 0 && (
+                                                    <p className="text-[12px] text-gray-400 font-medium">
+                                                        Cc: {reply.cc.join(', ')}
+                                                    </p>
+                                                )}
                                             </div>
-                                        ) : reply.type === 'client' ? (
-                                            <div className="w-10 h-10 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700 font-bold text-[13px] shadow-2xs flex-shrink-0">
-                                                {(reply.author || 'C')[0]?.toUpperCase()}
-                                            </div>
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold text-[13px] shadow-2xs flex-shrink-0">
-                                                {(reply.author || 'V')[0]?.toUpperCase()}
-                                            </div>
-                                        )}
-
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="text-[15px] font-bold text-gray-900 leading-tight">{reply.author}</span>
-                                                <span className="text-[13px] text-gray-400 font-medium">
-                                                    &lt;{reply.type === 'agent' ? 'support@edgestone.in' : (reply.to && reply.to.length > 0 ? reply.to[0] : (reply.type === 'client' ? ticket.email : 'vendor@example.com'))}&gt;
+                                            <div className="flex items-center gap-4 text-gray-400">
+                                                <span className="text-[13px] font-medium">
+                                                    {reply.createdAt ? `${formatDateWithTZ(reply.createdAt, globalTimeZone, { day: 'numeric', month: 'short', year: 'numeric' })} • ${formatTimeWithTZ(reply.createdAt, globalTimeZone)} hrs` : `${reply.date} • ${reply.time}`}
                                                 </span>
+                                                <div className="flex items-center gap-2.5">
+                                                    <button className="hover:text-gray-600 cursor-pointer" onClick={() => setShowEmailModal(true)} title="Reply">
+                                                        <CornerUpLeft size={16} />
+                                                    </button>
+                                                    <button className="hover:text-gray-600 cursor-pointer" onClick={() => setShowEmailModal(true)} title="Reply to Thread">
+                                                        <ReplyIcon size={16} className="-scale-x-100" />
+                                                    </button>
+                                                    <button className="hover:text-gray-600">
+                                                        <MoreVertical size={16} />
+                                                    </button>
+                                                </div>
                                             </div>
+                                        </div>
 
-                                            {/* Outlook-Style To: line with circular indicators */}
-                                            <div className="flex items-center gap-1.5 text-[12.5px] text-gray-600 flex-wrap">
-                                                <span className="text-gray-400 font-medium w-5">To</span>
-                                                {(() => {
-                                                    const tos = reply.type === 'agent'
-                                                        ? (reply.to?.length ? reply.to : [activeTab === 'client' ? ticket.email : 'Vendor NOC'])
-                                                        : ['support@edgestone.in', ...((reply.to || []).slice(1).filter((e: string) => e && e.toLowerCase() !== 'support@edgestone.in'))];
-                                                    return tos.map((rec: string, i: number) => (
-                                                        <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 border border-gray-200/60 text-gray-700 rounded-full text-[12px]">
-                                                            <span className="w-1.5 h-1.5 rounded-full border border-gray-400 bg-white"></span>
-                                                            {rec}
-                                                        </span>
-                                                    ));
-                                                })()}
-                                            </div>
-
-                                            {/* Outlook-Style Cc: line with circular indicators */}
-                                            {reply.cc && reply.cc.length > 0 && (
-                                                <div className="flex items-center gap-1.5 text-[12.5px] text-gray-500 flex-wrap">
-                                                    <span className="text-gray-400 font-medium w-5">Cc</span>
-                                                    {reply.cc.map((ccEmail: string, i: number) => (
-                                                        <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 border border-gray-200/60 text-gray-600 rounded-full text-[12px]">
-                                                            <span className="w-1.5 h-1.5 rounded-full border border-gray-400 bg-white"></span>
-                                                            {ccEmail}
-                                                        </span>
+                                        <div className="text-[14px] text-gray-600 leading-relaxed font-medium space-y-4 break-words">
+                                            <MessageBodyRenderer text={reply.text} rawHtml={reply.rawHtml} />
+                                            {reply.attachments && reply.attachments.length > 0 && (
+                                                <div className="mt-3 flex flex-col gap-2">
+                                                    {reply.attachments.map((att: any, attIdx: number) => (
+                                                        <AttachmentItemRenderer key={attIdx} att={att} index={attIdx} />
                                                     ))}
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
 
-                                    {/* Right Side: Quick Outlook Actions & Timestamp */}
-                                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                        <div className="flex items-center gap-1 bg-gray-50 border border-gray-200/80 rounded-xl p-1 shadow-2xs">
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowEmailModal(true)}
-                                                className="flex items-center gap-1.5 px-2.5 py-1 text-gray-700 hover:text-gray-900 hover:bg-white rounded-lg text-xs font-semibold transition-all shadow-2xs border border-transparent hover:border-gray-200/80"
-                                                title="Reply"
-                                            >
-                                                <CornerUpLeft size={13} className="text-blue-600" />
-                                                <span>Reply</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowEmailModal(true)}
-                                                className="flex items-center gap-1.5 px-2.5 py-1 text-gray-700 hover:text-gray-900 hover:bg-white rounded-lg text-xs font-semibold transition-all shadow-2xs border border-transparent hover:border-gray-200/80"
-                                                title="Reply All"
-                                            >
-                                                <ReplyIcon size={13} className="text-purple-600" />
-                                                <span>Reply All</span>
-                                            </button>
-                                        </div>
-                                        <span className="text-[12px] text-gray-400 font-medium">
-                                            {reply.createdAt ? `${formatDateWithTZ(reply.createdAt, globalTimeZone, { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })} ${formatTimeWithTZ(reply.createdAt, globalTimeZone)}` : `${reply.date} • ${reply.time}`}
-                                        </span>
+                                        <div className="absolute left-[-17px] top-5 w-4 h-4 bg-white border-l border-b border-gray-100 rotate-45"></div>
                                     </div>
                                 </div>
-
-                                {/* Email Body with Outlook typography */}
-                                <div className="pt-4 text-[14.5px] text-[#0f172a] leading-relaxed font-normal break-words">
-                                    <MessageBodyRenderer text={reply.text} rawHtml={reply.rawHtml} />
-                                </div>
-
-                                {/* Attachments */}
-                                {reply.attachments && reply.attachments.length > 0 && (
-                                    <div className="mt-4 pt-3 border-t border-gray-100 flex flex-wrap gap-2">
-                                        {reply.attachments.map((att: any, attIdx: number) => (
-                                            <AttachmentItemRenderer key={attIdx} att={att} index={attIdx} />
-                                        ))}
-                                    </div>
-                                )}
                             </div>
-                        </div>
+                            <div className="ml-5 border-l-2 border-gray-100 py-1"></div>
+                        </React.Fragment>
                     ))}
 
                     {/* Reply CTA */}
