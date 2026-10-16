@@ -663,10 +663,57 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         setShowCc(false);
     }, [ticket.id]);
 
-
     const [confirmedCircuit, setConfirmedCircuit] = useState(() => {
         return localStorage.getItem(`confirmed_circuit_id_${ticket.id}`) || ticket.circuitId || '';
     });
+
+    // Automatically load circuit data into ticketCircuit
+    useEffect(() => {
+        let isMounted = true;
+        const loadCircuit = async () => {
+            const cktId = confirmedCircuit || ticket.circuitId;
+            if (!cktId) return;
+            try {
+                const circuits = await circuitService.getAllCircuits();
+                const found = circuits.find((c: any) => 
+                    c.id === cktId || 
+                    c.customerCircuitId?.toLowerCase() === cktId.toLowerCase() || 
+                    c.supplierCircuitId?.toLowerCase() === cktId.toLowerCase()
+                );
+                if (found && isMounted) {
+                    setTicketCircuit(found);
+                }
+            } catch (e) {
+                console.error('Failed to load circuit for ticket:', e);
+            }
+        };
+        loadCircuit();
+        return () => { isMounted = false; };
+    }, [confirmedCircuit, ticket.circuitId]);
+
+    // Automatically resolve and set vendor emails when communicating on vendor tabs
+    useEffect(() => {
+        if (!activeTab.startsWith('vendor')) return;
+        const vId = activeTab.replace('vendor_', '');
+        const effectiveVendorId = vId !== 'vendor' ? vId : undefined;
+        let isMounted = true;
+        ticketService.getVendorEmails(ticket.id, effectiveVendorId).then(emails => {
+            if (!isMounted) return;
+            if (emails && emails.length > 0) {
+                const filtered = emails.filter(e => !clientEmailsSet.has(e.toLowerCase().trim()));
+                if (filtered.length > 0) {
+                    setVendorEmailsByTab(prev => ({ ...prev, [activeTab]: filtered }));
+                    setEmailForm(prev => {
+                        if (prev.to.length === 0) {
+                            return { ...prev, to: filtered };
+                        }
+                        return prev;
+                    });
+                }
+            }
+        }).catch(console.error);
+        return () => { isMounted = false; };
+    }, [ticket.id, activeTab, clientEmailsSet]);
 
     // Dedicated memoized vendor emails for the current active tab (strictly excluding client emails)
     const currentVendorEmails = useMemo(() => {
@@ -683,11 +730,23 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
             const filtered = ticket.vendor.emails.filter((e: string) => !clientEmailsSet.has(e.toLowerCase().trim()));
             if (filtered.length > 0) return filtered;
         }
+        if (ticketCircuit?.vendor?.emails && ticketCircuit.vendor.emails.length > 0) {
+            const filtered = ticketCircuit.vendor.emails.filter((e: string) => !clientEmailsSet.has(e.toLowerCase().trim()));
+            if (filtered.length > 0) return filtered;
+        }
+        if (ticketCircuit?.vendorCircuits && ticketCircuit.vendorCircuits.length > 0) {
+            const currentVendorId = activeTab.replace('vendor_', '');
+            const matchedVc = ticketCircuit.vendorCircuits.find((vc: any) => vc.vendorId === currentVendorId);
+            if (matchedVc?.vendor?.emails) {
+                const filtered = matchedVc.vendor.emails.filter((e: string) => !clientEmailsSet.has(e.toLowerCase().trim()));
+                if (filtered.length > 0) return filtered;
+            }
+        }
         if (ticket.ticketType === 'Vendor' && ticket.email && !clientEmailsSet.has(ticket.email.toLowerCase().trim())) {
             return [ticket.email];
         }
         return [];
-    }, [activeTab, vendorEmailsByTab, tabRecipients, clientEmailsSet, ticket.vendor, ticket.ticketType, ticket.email]);
+    }, [activeTab, vendorEmailsByTab, tabRecipients, clientEmailsSet, ticket.vendor, ticketCircuit, ticket.ticketType, ticket.email]);
 
     // Guaranteed safe display vendor email for thread card
     const displayVendorEmail = useMemo(() => {
@@ -775,6 +834,16 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 targetTo = vendorEmailsByTab[newTab].filter(e => !clientEmailsSet.has(e.toLowerCase().trim()));
             } else if (ticket.vendor?.emails && ticket.vendor.emails.length > 0) {
                 targetTo = ticket.vendor.emails.filter((e: string) => !clientEmailsSet.has(e.toLowerCase().trim()));
+            } else if (ticketCircuit?.vendor?.emails && ticketCircuit.vendor.emails.length > 0) {
+                targetTo = ticketCircuit.vendor.emails.filter((e: string) => !clientEmailsSet.has(e.toLowerCase().trim()));
+            } else if (ticketCircuit?.vendorCircuits && ticketCircuit.vendorCircuits.length > 0) {
+                const currentVendorId = newTab.replace('vendor_', '');
+                const matchedVc = ticketCircuit.vendorCircuits.find((vc: any) => vc.vendorId === currentVendorId);
+                if (matchedVc?.vendor?.emails) {
+                    targetTo = matchedVc.vendor.emails.filter((e: string) => !clientEmailsSet.has(e.toLowerCase().trim()));
+                } else if (ticketCircuit.vendorCircuits[0].vendor?.emails) {
+                    targetTo = ticketCircuit.vendorCircuits[0].vendor.emails.filter((e: string) => !clientEmailsSet.has(e.toLowerCase().trim()));
+                }
             } else if (ticket.ticketType === 'Vendor' && ticket.email && !clientEmailsSet.has(ticket.email.toLowerCase().trim())) {
                 targetTo = [ticket.email];
             } else {
@@ -810,7 +879,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         startTransition(() => {
             setActiveTab(newTab);
         });
-    }, [activeTab, emailForm.to, emailForm.cc, emailForm.bcc, tabRecipients, ticket, vendorEmailsByTab]);
+    }, [activeTab, emailForm.to, emailForm.cc, emailForm.bcc, tabRecipients, ticket, ticketCircuit, vendorEmailsByTab, clientEmailsSet]);
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -1390,6 +1459,11 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         const hasContent = replyHtml.trim() || replyText.trim() || signatureHtml || attachments.length > 0;
         if (!hasContent) return;
 
+        if (!emailForm.to || emailForm.to.length === 0) {
+            toast.error('Please specify at least one recipient email address in the "To" field.');
+            return;
+        }
+
         // ── Build the plain-text body ──
         const plainBody = replyText.trim() || replyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -1471,9 +1545,9 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 }
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to send reply:', error);
-            toast.error('Failed to send reply. Please try again.');
+            toast.error(error?.message || 'Failed to send reply. Please try again.');
         } finally {
             setIsSending(false);
         }
