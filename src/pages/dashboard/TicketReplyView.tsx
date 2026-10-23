@@ -811,21 +811,16 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                     targetTo = ticket.email ? [ticket.email] : [];
                 }
             }
-            targetCc = tabRecipients['client']?.cc || [];
-            targetBcc = tabRecipients['client']?.bcc || [];
-            if (targetCc.length === 0) {
+            if (tabRecipients['client']) {
+                targetCc = tabRecipients['client'].cc || [];
+                targetBcc = tabRecipients['client'].bcc || [];
+            } else {
                 const clientCcs = new Set<string>();
-                const storedClientCc = localStorage.getItem(`ticket_client_cc_${ticket.id}`);
-                if (storedClientCc) {
-                    try {
-                        const parsed = JSON.parse(storedClientCc);
-                        if (Array.isArray(parsed)) parsed.forEach(e => e && clientCcs.add(e.toLowerCase().trim()));
-                    } catch (_) {}
-                }
                 if (ticket.cc && Array.isArray(ticket.cc)) {
                     ticket.cc.forEach(e => e && clientCcs.add(e.toLowerCase().trim()));
                 }
                 targetCc = Array.from(clientCcs);
+                targetBcc = [];
             }
         } else if (newTab.startsWith('vendor')) {
             if (tabRecipients[newTab]?.to && tabRecipients[newTab].to.length > 0) {
@@ -849,16 +844,12 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
             } else {
                 targetTo = [];
             }
-            targetCc = tabRecipients[newTab]?.cc || [];
-            targetBcc = tabRecipients[newTab]?.bcc || [];
-            if (targetCc.length === 0) {
-                const storedVendorCc = localStorage.getItem(`ticket_vendor_cc_${ticket.id}_${newTab}`);
-                if (storedVendorCc) {
-                    try {
-                        const parsed = JSON.parse(storedVendorCc);
-                        if (Array.isArray(parsed)) targetCc = parsed.filter(Boolean);
-                    } catch (_) {}
-                }
+            if (tabRecipients[newTab]) {
+                targetCc = tabRecipients[newTab].cc || [];
+                targetBcc = tabRecipients[newTab].bcc || [];
+            } else {
+                targetCc = [];
+                targetBcc = [];
             }
         }
 
@@ -1106,62 +1097,36 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         let targetCc: string[] = [];
         let targetBcc: string[] = [];
 
-        if (tabRecipients[activeTab]?.cc?.length || tabRecipients[activeTab]?.bcc?.length) {
-            targetCc = tabRecipients[activeTab].cc;
-            targetBcc = tabRecipients[activeTab].bcc;
+        if (tabRecipients[activeTab]) {
+            targetCc = tabRecipients[activeTab].cc || [];
+            targetBcc = tabRecipients[activeTab].bcc || [];
         } else if (activeTab === 'client') {
             const clientCcs = new Set<string>();
-            const storedClientCc = localStorage.getItem(`ticket_client_cc_${ticket.id}`);
-            if (storedClientCc) {
-                try {
-                    const parsed = JSON.parse(storedClientCc);
-                    if (Array.isArray(parsed)) parsed.forEach(e => e && clientCcs.add(e.toLowerCase().trim()));
-                } catch (_) {}
-            }
             if (ticket.cc && Array.isArray(ticket.cc)) {
                 ticket.cc.forEach(email => email && clientCcs.add(email.toLowerCase().trim()));
             }
-            if (replies && Array.isArray(replies)) {
-                replies.forEach(reply => {
-                    const isClientReply = reply.category === 'client' || (!reply.category && reply.type !== 'vendor');
-                    if (isClientReply) {
-                        if (reply.cc && Array.isArray(reply.cc)) {
-                            reply.cc.forEach(email => email && clientCcs.add(email.toLowerCase().trim()));
+            // If ticket.cc was empty, initialize from the LATEST client reply only
+            if (clientCcs.size === 0 && replies && Array.isArray(replies)) {
+                const latestClientReply = [...replies].reverse().find(r => r.category === 'client' || (!r.category && r.type !== 'vendor'));
+                if (latestClientReply?.cc && Array.isArray(latestClientReply.cc)) {
+                    latestClientReply.cc.forEach(email => {
+                        const clean = email && email.toLowerCase().trim();
+                        if (clean && !clean.includes('edgestone.in') && clean !== ticket.email?.toLowerCase()) {
+                            clientCcs.add(clean);
                         }
-                        if (reply.to && Array.isArray(reply.to)) {
-                            reply.to.forEach(email => {
-                                const clean = email && email.toLowerCase().trim();
-                                if (clean && !clean.includes('edgestone.in') && clean !== ticket.email?.toLowerCase()) {
-                                    clientCcs.add(clean);
-                                }
-                            });
-                        }
-                    }
-                });
+                    });
+                }
             }
             targetCc = Array.from(clientCcs);
         } else if (activeTab.startsWith('vendor')) {
             const isSpecificVendor = activeTab.startsWith('vendor_');
             const specificVendorId = isSpecificVendor ? activeTab.replace('vendor_', '') : null;
 
-            // Collect all client-side emails (requester, client CCs, client reply recipients) to guarantee client emails NEVER appear in vendor CC
+            // Collect all client-side emails to guarantee client emails NEVER appear in vendor CC
             const clientEmails = new Set<string>();
             if (ticket.email) clientEmails.add(ticket.email.toLowerCase().trim());
             if (ticket.cc && Array.isArray(ticket.cc)) {
                 ticket.cc.forEach(email => email && clientEmails.add(email.toLowerCase().trim()));
-            }
-            if (replies && Array.isArray(replies)) {
-                replies.forEach(reply => {
-                    const isClientReply = reply.category === 'client' || (!reply.category && reply.type !== 'vendor');
-                    if (isClientReply) {
-                        if (reply.cc && Array.isArray(reply.cc)) {
-                            reply.cc.forEach(email => email && clientEmails.add(email.toLowerCase().trim()));
-                        }
-                        if (reply.to && Array.isArray(reply.to)) {
-                            reply.to.forEach(email => email && clientEmails.add(email.toLowerCase().trim()));
-                        }
-                    }
-                });
             }
 
             // Also collect other vendors' emails so vendor 1's emails NEVER leak into vendor 2's CC
@@ -1175,45 +1140,21 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
             }
 
             const vendorCcs = new Set<string>();
-            const storedVendorCc = localStorage.getItem(`ticket_vendor_cc_${ticket.id}_${activeTab}`);
-            if (storedVendorCc) {
-                try {
-                    const parsed = JSON.parse(storedVendorCc);
-                    if (Array.isArray(parsed)) {
-                        parsed.forEach(e => {
-                            const clean = e && e.toLowerCase().trim();
-                            if (clean && !clientEmails.has(clean) && !otherVendorsEmails.has(clean)) {
-                                vendorCcs.add(clean);
-                            }
-                        });
-                    }
-                } catch (_) {}
-            }
-
+            // Initialize from the LATEST vendor reply for this tab only
             if (replies && Array.isArray(replies)) {
-                replies.forEach(reply => {
-                    const isVendorReply = isSpecificVendor
-                        ? reply.category === activeTab
-                        : (reply.category === 'vendor' || (!reply.category && reply.type === 'vendor'));
-                    if (isVendorReply) {
-                        if (reply.cc && Array.isArray(reply.cc)) {
-                            reply.cc.forEach(email => {
-                                const clean = email && email.toLowerCase().trim();
-                                if (clean && !clean.includes('edgestone.in') && !clientEmails.has(clean) && !otherVendorsEmails.has(clean)) {
-                                    vendorCcs.add(clean);
-                                }
-                            });
+                const latestVendorReply = [...replies].reverse().find(r => 
+                    isSpecificVendor
+                        ? r.category === activeTab
+                        : (r.category === 'vendor' || (!r.category && r.type === 'vendor'))
+                );
+                if (latestVendorReply?.cc && Array.isArray(latestVendorReply.cc)) {
+                    latestVendorReply.cc.forEach(email => {
+                        const clean = email && email.toLowerCase().trim();
+                        if (clean && !clean.includes('edgestone.in') && !clientEmails.has(clean) && !otherVendorsEmails.has(clean)) {
+                            vendorCcs.add(clean);
                         }
-                        if (reply.to && Array.isArray(reply.to)) {
-                            reply.to.forEach(email => {
-                                const clean = email && email.toLowerCase().trim();
-                                if (clean && !clean.includes('edgestone.in') && !clientEmails.has(clean) && !otherVendorsEmails.has(clean)) {
-                                    vendorCcs.add(clean);
-                                }
-                            });
-                        }
-                    }
-                });
+                    });
+                }
             }
             targetCc = Array.from(vendorCcs);
         }
@@ -1500,17 +1441,13 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 if (finalSubject) {
                     localStorage.setItem(`vendor_subject_${ticket.id}_${activeTab}`, finalSubject);
                 }
-                if (emailForm.cc && emailForm.cc.length > 0) {
-                    localStorage.setItem(`ticket_vendor_cc_${ticket.id}_${activeTab}`, JSON.stringify(emailForm.cc));
-                }
+                localStorage.removeItem(`ticket_vendor_cc_${ticket.id}_${activeTab}`);
             } else {
                 newReply = await ticketService.replyToTicket(ticket.id, plainBody, fullHtmlContent, uploadedAttachments, {
                     ...emailForm,
                     subject: finalSubject
                 });
-                if (emailForm.cc && emailForm.cc.length > 0) {
-                    localStorage.setItem(`ticket_client_cc_${ticket.id}`, JSON.stringify(emailForm.cc));
-                }
+                localStorage.removeItem(`ticket_client_cc_${ticket.id}`);
             }
 
             // Update local state
@@ -1632,9 +1569,9 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 }));
 
                 if (activeTab.startsWith('vendor')) {
-                    localStorage.setItem(`ticket_vendor_cc_${ticket.id}_${activeTab}`, JSON.stringify(nextCc));
+                    localStorage.removeItem(`ticket_vendor_cc_${ticket.id}_${activeTab}`);
                 } else if (activeTab === 'client') {
-                    localStorage.setItem(`ticket_client_cc_${ticket.id}`, JSON.stringify(nextCc));
+                    localStorage.removeItem(`ticket_client_cc_${ticket.id}`);
                 }
 
                 return {
@@ -1665,9 +1602,9 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
 
             if (field === 'cc') {
                 if (activeTab.startsWith('vendor')) {
-                    localStorage.setItem(`ticket_vendor_cc_${ticket.id}_${activeTab}`, JSON.stringify(nextField));
+                    localStorage.removeItem(`ticket_vendor_cc_${ticket.id}_${activeTab}`);
                 } else if (activeTab === 'client') {
-                    localStorage.setItem(`ticket_client_cc_${ticket.id}`, JSON.stringify(nextField));
+                    localStorage.removeItem(`ticket_client_cc_${ticket.id}`);
                 }
             }
             return {

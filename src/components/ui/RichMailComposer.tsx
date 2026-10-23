@@ -321,13 +321,31 @@ export const RichMailComposer: React.FC<RichMailComposerProps> = ({
                     .replace(/<\/?w:[^>]*>/gi, '')
                     .replace(/<\/?m:[^>]*>/gi, '');
 
-                // Ensure tables have modern classes and crisp borders
-                clean = clean.replace(/<table\b[^>]*>/gi, '<table class="edgestone-table" style="width:100%;border-collapse:collapse;margin:12px 0;font-size:13px;border:1px solid #cbd5e1;">');
+                // Ensure tables have modern classes and crisp borders with Outlook compatibility
+                clean = clean.replace(/<table\b([^>]*)>/gi, (_, attrs) => {
+                    let styleVal = '';
+                    const styleMatch = (attrs || '').match(/style=["']([^"']*)["']/i);
+                    if (styleMatch) styleVal = styleMatch[1].replace(/;?$/, '; ');
+                    const cleanAttrs = (attrs || '')
+                        .replace(/\s*style=["'][^"']*["']/gi, '')
+                        .replace(/\s*border=["'][^"']*["']/gi, '')
+                        .replace(/\s*cellpadding=["'][^"']*["']/gi, '')
+                        .replace(/\s*cellspacing=["'][^"']*["']/gi, '');
+                    return `<table border="1" cellpadding="0" cellspacing="0" class="edgestone-table" style="width:100%;border-collapse:collapse;margin:12px 0;font-size:13px;border:1px solid #cbd5e1;mso-table-lspace:0pt;mso-table-rspace:0pt;${styleVal}" ${cleanAttrs}>`;
+                });
                 clean = clean.replace(/<th\b([^>]*)>/gi, (_, attrs) => {
-                    return `<th style="background-color:#f1f5f9;color:#0f172a;font-weight:700;padding:8px 12px;border:1px solid #cbd5e1;text-align:left;" ${attrs || ''}>`;
+                    let styleVal = '';
+                    const styleMatch = (attrs || '').match(/style=["']([^"']*)["']/i);
+                    if (styleMatch) styleVal = styleMatch[1].replace(/;?$/, '; ');
+                    const cleanAttrs = (attrs || '').replace(/\s*style=["'][^"']*["']/gi, '');
+                    return `<th style="background-color:#f1f5f9;color:#0f172a;font-weight:700;padding:8px 12px;border:1px solid #cbd5e1;text-align:left;font-size:13px;${styleVal}" ${cleanAttrs}>`;
                 });
                 clean = clean.replace(/<td\b([^>]*)>/gi, (_, attrs) => {
-                    return `<td style="padding:8px 12px;border:1px solid #cbd5e1;color:#334155;vertical-align:top;" ${attrs || ''}>`;
+                    let styleVal = '';
+                    const styleMatch = (attrs || '').match(/style=["']([^"']*)["']/i);
+                    if (styleMatch) styleVal = styleMatch[1].replace(/;?$/, '; ');
+                    const cleanAttrs = (attrs || '').replace(/\s*style=["'][^"']*["']/gi, '');
+                    return `<td style="padding:8px 12px;border:1px solid #cbd5e1;color:#334155;vertical-align:top;font-size:13px;${styleVal}" ${cleanAttrs}>`;
                 });
 
                 document.execCommand('insertHTML', false, clean);
