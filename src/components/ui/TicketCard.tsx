@@ -16,6 +16,8 @@ interface TicketCardProps {
     latestActivityType?: 'client' | 'vendor' | 'agent';
     needsAction?: boolean;
     awaitingResponse?: boolean;
+    isCarriedForward?: boolean;
+    isCreatedToday?: boolean;
     onReply?: () => void;
     onDelete?: () => void;
 }
@@ -59,6 +61,8 @@ export const TicketCard: React.FC<TicketCardProps> = ({
     latestActivityDate,
     needsAction,
     awaitingResponse,
+    isCarriedForward,
+    isCreatedToday,
     onReply,
     onDelete
 }) => {
@@ -93,8 +97,8 @@ export const TicketCard: React.FC<TicketCardProps> = ({
                         </div>
                     </div>
 
-                    {/* Ticket Classification Badge */}
-                    <div className="flex-shrink-0">
+                    {/* Ticket Classification & Day-Wise Badges */}
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
                         {isMaint ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
                                 🛠️ Maintenance
@@ -102,6 +106,16 @@ export const TicketCard: React.FC<TicketCardProps> = ({
                         ) : (
                             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
                                 🎫 Client Support
+                            </span>
+                        )}
+                        {isCarriedForward && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200" title="Ticket carried forward from previous days">
+                                📁 Carry Forward
+                            </span>
+                        )}
+                        {isCreatedToday && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                ✨ New Today
                             </span>
                         )}
                     </div>

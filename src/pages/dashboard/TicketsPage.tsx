@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { TicketReplyView } from './TicketReplyView';
 import { Topbar } from '../../components/ui/Topbar';
-import { SubHeader } from '../../components/ui/SubHeader';
+import { SubHeader, type Tab } from '../../components/ui/SubHeader';
 import { type FilterType } from '../../components/ui/DatePickerDropdown';
 import {
     Rows2,
@@ -54,12 +54,26 @@ const toISTDateString = (date: Date | string | undefined): string => {
     }
 };
 
+const getActivityFilterLabel = (filter: ActivityFilterType): string => {
+    switch (filter) {
+        case 'new-support': return 'Support Today';
+        case 'new-maint': return 'Maintenance Today';
+        case 'active-today': return 'Active Today';
+        case 'needs-action': return 'Needs Action';
+        case 'awaiting-response': return 'Awaiting Reply';
+        case 'carried-forward': return 'Carry Forward (From Previous Days)';
+        case 'resolved-today': return 'Resolved Today';
+        default: return 'All Tickets';
+    }
+};
+
 const TicketsPage: React.FC = () => {
     const { refresh: refreshDashboard } = useDashboardData();
     const { canDelete } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
     const urlTicketId = searchParams.get('ticketId') || searchParams.get('search');
-    const [activeTab, setActiveTab] = useState('open');
+    // Default to 'all' so users immediately see all open & historical tickets without being blocked
+    const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [appliedFilter, setAppliedFilter] = useState<FilterType>('all');
     const [appliedCustomRange, setAppliedCustomRange] = useState({ start: '', end: '' });
@@ -123,14 +137,45 @@ const TicketsPage: React.FC = () => {
         setAppliedCustomRange(range);
     };
 
-    const tabs = [
-        { id: 'open', label: 'Open', icon: Rows2 },
-        { id: 'in-progress', label: 'In Progress', icon: Columns2 },
-        { id: 'closed', label: 'Closed', icon: CheckSquare },
-        { id: 'spam', label: 'Spam', icon: Filter },
-        { id: 'others', label: 'Others', icon: Filter },
-        { id: 'maintenance', label: 'Maintenance', icon: Filter },
-    ];
+    // Calculate exact counts for each tab so user immediately sees where tickets are located
+    const tabCounts = useMemo(() => {
+        let all = tickets.length;
+        let open = 0;
+        let inProgress = 0;
+        let closed = 0;
+        let spam = 0;
+        let others = 0;
+        let maintenance = 0;
+
+        tickets.forEach(t => {
+            const currentStatus = (t.status || '').toLowerCase().replace(/\s+/g, '-');
+            if (t.isMaintenance || currentStatus === 'maintenance') {
+                maintenance++;
+            } else if (currentStatus === 'closed' || currentStatus === 'resolved') {
+                closed++;
+            } else if (currentStatus === 'spam') {
+                spam++;
+            } else if (currentStatus === 'others') {
+                others++;
+            } else if (currentStatus === 'in-progress') {
+                inProgress++;
+            } else if (currentStatus === 'open') {
+                open++;
+            }
+        });
+
+        return { all, open, inProgress, closed, spam, others, maintenance };
+    }, [tickets]);
+
+    const tabs: Tab[] = useMemo(() => [
+        { id: 'all', label: 'All Tickets', icon: Rows2, count: tabCounts.all },
+        { id: 'open', label: 'Open', icon: Rows2, count: tabCounts.open },
+        { id: 'in-progress', label: 'In Progress', icon: Columns2, count: tabCounts.inProgress },
+        { id: 'maintenance', label: 'Maintenance', icon: Wrench, count: tabCounts.maintenance },
+        { id: 'others', label: 'Others', icon: Filter, count: tabCounts.others },
+        { id: 'closed', label: 'Closed', icon: CheckSquare, count: tabCounts.closed },
+        { id: 'spam', label: 'Spam', icon: AlertCircle, count: tabCounts.spam },
+    ], [tabCounts]);
 
     useEffect(() => {
         if (urlTicketId && tickets.length > 0) {
@@ -240,15 +285,26 @@ const TicketsPage: React.FC = () => {
             const currentStatus = (t.status || '').toLowerCase().replace(/\s+/g, '-');
             const meta = getTicketMeta(t);
 
-            // Tab filter
-            if (activeTab === 'maintenance') {
-                if (!t.isMaintenance) return false;
-            } else if (activeTab === 'spam' || activeTab === 'others') {
-                if (t.isMaintenance) return false;
-                if (currentStatus !== activeTab) return false;
-            } else {
-                if (t.isMaintenance) return false;
-                if (currentStatus !== activeTab) return false;
+            // Tab filter:
+            // When an activity filter chip is specifically active (e.g. 'carried-forward', 'needs-action', etc.),
+            // do NOT restrict by activeTab so all matching tickets across categories are visible.
+            if (activityFilter === 'all') {
+                if (activeTab === 'all') {
+                    // Show all tickets across all statuses
+                } else if (activeTab === 'maintenance') {
+                    if (!t.isMaintenance && currentStatus !== 'maintenance') return false;
+                } else if (activeTab === 'spam' || activeTab === 'others') {
+                    if (t.isMaintenance) return false;
+                    if (currentStatus !== activeTab) return false;
+                } else if (activeTab === 'in-progress') {
+                    if (t.isMaintenance) return false;
+                    if (currentStatus !== 'in-progress' && currentStatus !== 'in progress') return false;
+                } else if (activeTab === 'open') {
+                    if (t.isMaintenance) return false;
+                    if (currentStatus !== 'open') return false;
+                } else if (activeTab === 'closed') {
+                    if (currentStatus !== 'closed' && currentStatus !== 'resolved') return false;
+                }
             }
 
             // Search query filter
@@ -263,6 +319,7 @@ const TicketsPage: React.FC = () => {
             }
 
             // Date Range filter (IST based)
+            // When 'all' is selected in the DatePickerDropdown, NEVER filter out historical or old tickets!
             const ticketDateStr = meta.createdDateStr;
 
             if (appliedFilter === 'today') {
@@ -302,7 +359,7 @@ const TicketsPage: React.FC = () => {
         });
     }, [tickets, activeTab, searchQuery, appliedFilter, appliedCustomRange, activityFilter, todayStr]);
 
-    // Grouping by Day for Timeline View
+    // Grouping by Day for Timeline View (Groups tickets by creation date descending)
     const groupedTickets = useMemo(() => {
         if (!isGroupedByDay) return null;
 
@@ -310,18 +367,18 @@ const TicketsPage: React.FC = () => {
 
         filteredTickets.forEach(ticket => {
             const meta = getTicketMeta(ticket);
-            const dateKey = meta.latestActivityDateStr || meta.createdDateStr || 'Earlier';
+            const dateKey = meta.createdDateStr || 'Earlier';
 
             if (!groups[dateKey]) {
                 let label = dateKey;
                 if (dateKey === todayStr) {
-                    label = `Today (${formatDateIST(dateKey, { day: 'numeric', month: 'short' })})`;
+                    label = `Today (${formatDateIST(dateKey, { day: 'numeric', month: 'short', year: 'numeric' })})`;
                 } else {
                     const yesterday = new Date();
                     yesterday.setDate(yesterday.getDate() - 1);
                     if (dateKey === toISTDateString(yesterday)) {
-                        label = `Yesterday (${formatDateIST(dateKey, { day: 'numeric', month: 'short' })})`;
-                    } else {
+                        label = `Yesterday (${formatDateIST(dateKey, { day: 'numeric', month: 'short', year: 'numeric' })})`;
+                    } else if (dateKey !== 'Earlier') {
                         label = formatDateIST(dateKey, { day: 'numeric', month: 'short', year: 'numeric' });
                     }
                 }
@@ -527,7 +584,12 @@ const TicketsPage: React.FC = () => {
 
                         {/* Resolved Today */}
                         <button
-                            onClick={() => setActivityFilter(prev => prev === 'resolved-today' ? 'all' : 'resolved-today')}
+                            onClick={() => {
+                                if (dayWiseMetrics.resolvedToday === 0 && activityFilter !== 'resolved-today') {
+                                    toast('0 tickets resolved today. All historical closed tickets are in the "Closed" tab.', { icon: 'ℹ️' });
+                                }
+                                setActivityFilter(prev => prev === 'resolved-today' ? 'all' : 'resolved-today');
+                            }}
                             className={`flex flex-col text-left p-2.5 rounded-xl border transition-all ${
                                 activityFilter === 'resolved-today' 
                                     ? 'bg-teal-50 border-teal-400 ring-2 ring-teal-100' 
@@ -546,6 +608,25 @@ const TicketsPage: React.FC = () => {
 
             {/* Tickets Grid / Grouped Timeline Container */}
             <div className="px-4 sm:px-8 pb-8 flex-1 overflow-auto mt-4">
+                {/* Active Activity Filter Banner */}
+                {activityFilter !== 'all' && (
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 bg-amber-50/80 border border-amber-200 rounded-xl px-4 py-2.5 shadow-2xs">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                            <span className="text-xs font-semibold text-amber-950">
+                                Filtered by <strong>{getActivityFilterLabel(activityFilter)}</strong>: Showing <strong>{filteredTickets.length}</strong> ticket{filteredTickets.length !== 1 ? 's' : ''} across all categories.
+                            </span>
+                        </div>
+                        <button
+                            onClick={() => setActivityFilter('all')}
+                            className="text-xs font-bold text-amber-800 hover:text-amber-950 hover:underline flex items-center gap-1 bg-white border border-amber-300 px-2.5 py-1 rounded-lg"
+                        >
+                            <X size={12} />
+                            Show All Tickets ({tickets.length})
+                        </button>
+                    </div>
+                )}
+
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -597,6 +678,8 @@ const TicketsPage: React.FC = () => {
                                                     latestActivityType={meta.latestActivityType}
                                                     needsAction={meta.needsAgentAction}
                                                     awaitingResponse={meta.awaitingResponse}
+                                                    isCarriedForward={meta.isCarriedForward}
+                                                    isCreatedToday={meta.isCreatedToday}
                                                     onReply={() => setSelectedTicket(ticket)}
                                                     onDelete={canDelete() ? () => setTicketToDelete(ticket) : undefined}
                                                 />
@@ -626,6 +709,8 @@ const TicketsPage: React.FC = () => {
                                         latestActivityType={meta.latestActivityType}
                                         needsAction={meta.needsAgentAction}
                                         awaitingResponse={meta.awaitingResponse}
+                                        isCarriedForward={meta.isCarriedForward}
+                                        isCreatedToday={meta.isCreatedToday}
                                         onReply={() => setSelectedTicket(ticket)}
                                         onDelete={canDelete() ? () => setTicketToDelete(ticket) : undefined}
                                     />
@@ -634,20 +719,43 @@ const TicketsPage: React.FC = () => {
                         </div>
                     )
                 ) : (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-20 flex flex-col items-center justify-center text-center">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-16 flex flex-col items-center justify-center text-center">
                         <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300 mb-4">
                             <Filter size={32} strokeWidth={1.5} />
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">No tickets found</h3>
-                        <p className="text-gray-500 max-w-xs"> There are no tickets matching the current category and day-wise filter.</p>
-                        {activityFilter !== 'all' && (
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">
+                            {activityFilter === 'resolved-today'
+                                ? 'No tickets resolved today'
+                                : activityFilter !== 'all'
+                                ? `No tickets found for "${getActivityFilterLabel(activityFilter)}"`
+                                : 'No tickets found'}
+                        </h3>
+                        <p className="text-gray-500 max-w-md text-sm mb-5">
+                            {activityFilter === 'resolved-today'
+                                ? `No tickets were marked resolved today (${todayStr}). All historical resolved tickets are stored safely in the Closed tab (${tabCounts.closed}).`
+                                : activityFilter !== 'all'
+                                ? `There are no tickets matching "${getActivityFilterLabel(activityFilter)}" in this view. All ${tickets.length} tickets remain in the system.`
+                                : `No tickets match the selected category (${activeTab}).`}
+                        </p>
+                        <div className="flex flex-wrap items-center justify-center gap-3">
+                            {activityFilter !== 'all' && (
+                                <button
+                                    onClick={() => setActivityFilter('all')}
+                                    className="px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all shadow-xs"
+                                >
+                                    Reset Activity Filter
+                                </button>
+                            )}
                             <button
-                                onClick={() => setActivityFilter('all')}
-                                className="mt-4 px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all"
+                                onClick={() => {
+                                    setActivityFilter('all');
+                                    setActiveTab('all');
+                                }}
+                                className="px-4 py-2 bg-brand-red text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-all shadow-xs"
                             >
-                                Reset Activity Filter
+                                View All Tickets ({tickets.length})
                             </button>
-                        )}
+                        </div>
                     </div>
                 )}
             </div>
