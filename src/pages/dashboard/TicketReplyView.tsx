@@ -1834,7 +1834,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 <div className="flex items-center justify-between px-6">
                     <div className="flex items-center gap-8">
 
-                        {(ticket.ticketType !== 'Vendor' || ticket.isMaintenance || ticket.status?.toLowerCase() === 'maintenance') && (
+                        {(ticket.ticketType !== 'Vendor' || Boolean(ticket.clientId) || replies.some(r => isReplyForTab(r, 'client', ticketCircuit))) && (
                             <button
                                 onClick={() => switchTab('client')}
                                 className={`flex items-center gap-2 py-4 text-[14px] font-bold transition-all border-b-2 ${activeTab === 'client' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
