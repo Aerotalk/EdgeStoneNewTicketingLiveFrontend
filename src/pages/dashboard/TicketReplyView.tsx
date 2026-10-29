@@ -678,7 +678,8 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 const found = circuits.find((c: any) => 
                     c.id === cktId || 
                     c.customerCircuitId?.toLowerCase() === cktId.toLowerCase() || 
-                    c.supplierCircuitId?.toLowerCase() === cktId.toLowerCase()
+                    c.supplierCircuitId?.toLowerCase() === cktId.toLowerCase() ||
+                    (Array.isArray(c.vendorCircuits) && c.vendorCircuits.some((vc: any) => vc.supplierCircuitId?.toLowerCase() === cktId.toLowerCase()))
                 );
                 if (found && isMounted) {
                     setTicketCircuit(found);
