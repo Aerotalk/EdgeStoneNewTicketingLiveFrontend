@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import {
     BookOpen,
     ShieldCheck,
@@ -74,12 +75,55 @@ export const DocsPage: React.FC<DocsPageProps> = ({ embedded = false }) => {
         });
     }, [sections, selectedRole, searchQuery]);
 
+    const [allFaqsExpanded, setAllFaqsExpanded] = useState(false);
+
+    useEffect(() => {
+        const handleBeforePrint = () => {
+            document.title = 'EdgeStone_NOC_Operational_User_Manual';
+        };
+        const handleAfterPrint = () => {
+            document.title = 'EdgeStone NOC Suite';
+        };
+
+        window.addEventListener('beforeprint', handleBeforePrint);
+        window.addEventListener('afterprint', handleAfterPrint);
+
+        return () => {
+            window.removeEventListener('beforeprint', handleBeforePrint);
+            window.removeEventListener('afterprint', handleAfterPrint);
+        };
+    }, []);
+
+    const handleDownloadPDF = () => {
+        const originalTitle = document.title;
+        document.title = 'EdgeStone_NOC_Operational_User_Manual';
+        toast.success('Opening PDF preview... Select "Save as PDF" destination.', {
+            duration: 3500,
+            icon: '📄'
+        });
+        setTimeout(() => {
+            window.print();
+            setTimeout(() => {
+                document.title = originalTitle;
+            }, 1000);
+        }, 200);
+    };
+
     const handlePrint = () => {
+        const originalTitle = document.title;
+        document.title = 'EdgeStone_NOC_Operational_User_Manual';
         window.print();
+        setTimeout(() => {
+            document.title = originalTitle;
+        }, 1000);
     };
 
     const toggleFaq = (id: string) => {
         setExpandedFaq(prev => (prev === id ? null : id));
+    };
+
+    const toggleAllFaqs = () => {
+        setAllFaqsExpanded(prev => !prev);
     };
 
     const scrollToSection = (sectionId: string) => {
@@ -134,12 +178,21 @@ export const DocsPage: React.FC<DocsPageProps> = ({ embedded = false }) => {
                             </div>
 
                             <button
+                                onClick={handleDownloadPDF}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-brand-red hover:bg-brand-red-hover rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer"
+                                title="Download complete user manual as PDF"
+                            >
+                                <Download size={14} />
+                                <span>Download PDF</span>
+                            </button>
+
+                            <button
                                 onClick={handlePrint}
-                                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-2xs"
+                                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-2xs cursor-pointer"
                                 title="Print or Save as PDF"
                             >
-                                <Printer size={15} className="text-gray-500" />
-                                <span>Print / PDF</span>
+                                <Printer size={14} className="text-gray-500" />
+                                <span>Print</span>
                             </button>
 
                             <button
@@ -182,21 +235,33 @@ export const DocsPage: React.FC<DocsPageProps> = ({ embedded = false }) => {
                     </div>
 
                     {/* Right side status & action */}
-                    <div className="flex items-center gap-3 text-xs text-gray-500 w-full sm:w-auto justify-between sm:justify-end">
+                    <div className="flex items-center gap-2.5 text-xs text-gray-500 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 border border-gray-200/80 font-medium">
                             Role: <strong className="text-gray-800">{userRole}</strong>
                         </span>
 
-                        {embedded && (
-                            <button
-                                onClick={handlePrint}
-                                className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all shadow-2xs"
-                                title="Print or Save as PDF"
-                            >
-                                <Printer size={13} className="text-gray-500" />
-                                <span>Print Manual</span>
-                            </button>
-                        )}
+                        <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-semibold text-[11px]">
+                            <CheckCircle2 size={12} />
+                            Full 14 Sections
+                        </span>
+
+                        <button
+                            onClick={handleDownloadPDF}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-brand-red hover:bg-brand-red-hover rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer"
+                            title="Download complete user manual as PDF"
+                        >
+                            <Download size={13} />
+                            <span>Download PDF</span>
+                        </button>
+
+                        <button
+                            onClick={handlePrint}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all shadow-2xs cursor-pointer"
+                            title="Print Manual"
+                        >
+                            <Printer size={13} className="text-gray-500" />
+                            <span className="hidden sm:inline">Print Manual</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -206,7 +271,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({ embedded = false }) => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
                     
                     {/* Document Intro Card */}
-                    <div className="bg-white p-6 sm:p-7 rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-8">
+                    <div className="bg-white p-6 sm:p-7 rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-8 print:hidden">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2 mb-1.5">
@@ -273,10 +338,51 @@ export const DocsPage: React.FC<DocsPageProps> = ({ embedded = false }) => {
                         </aside>
 
                         {/* Right Content Area */}
-                        <main className="lg:col-span-9 space-y-6">
+                        <main className="lg:col-span-9 print:col-span-12 print:w-full space-y-6">
+
+                            {/* Executive Print / PDF Cover & Overview Header (Shows only in Print / PDF export) */}
+                            <div className="hidden print:block print:mb-8 print:pb-6 print:border-b-2 print:border-gray-900 print-avoid-break">
+                                <div className="flex items-center justify-between gap-4 mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <img src="/assets/logo.png" alt="EdgeStone" className="h-10 w-auto object-contain" />
+                                        <div>
+                                            <span className="text-xs font-black tracking-widest text-brand-red uppercase block">
+                                                EdgeStone NOC Operations Suite
+                                            </span>
+                                            <span className="text-lg font-black text-gray-900 block tracking-tight">
+                                                System Operations Manual & SOP Directory
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right text-[11px] text-gray-500 font-mono">
+                                        <div className="font-bold text-gray-900">DOC-EDG-NOC-2026-V2</div>
+                                        <div>Classification: Internal Confidential</div>
+                                        <div>Generated: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} IST</div>
+                                    </div>
+                                </div>
+                                
+                                <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-300 text-xs text-gray-700 leading-relaxed mb-4">
+                                    <strong>Document Scope: </strong> Official operating standard for Network Operations Center (NOC) operators, duty managers, and platform engineers. Defines core workflows across leased circuit correlation, dual-stream incident triage, real-time SLA penalty auditing, and carrier escalation matrices.
+                                </div>
+
+                                {/* Printable Table of Contents Summary Grid */}
+                                <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+                                    <span className="text-[11px] font-bold text-gray-800 uppercase tracking-wider block mb-2">
+                                        Index of Operational Sections (14 Total Topics)
+                                    </span>
+                                    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-gray-600">
+                                        {sections.map(s => (
+                                            <div key={s.id} className="flex items-center justify-between border-b border-gray-100 py-0.5">
+                                                <span className="font-medium text-gray-800 truncate">{s.title}</span>
+                                                <span className="text-gray-400 font-mono text-[10px] ml-1">{s.role === 'all' ? 'All Roles' : s.role}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
 
                             {/* SECTION 1: EXECUTIVE OVERVIEW & ARCHITECTURE */}
-                            <section id="intro" className="scroll-mt-6 bg-white p-6 sm:p-8 rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                            <section id="intro" className="scroll-mt-6 bg-white p-6 sm:p-8 rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] print:shadow-none print:border print:border-gray-200 print:p-6 print:rounded-xl print:mb-6 print-avoid-break">
                                 <div className="flex items-center gap-3 border-b border-gray-100 pb-4 mb-5">
                                     <div className="w-9 h-9 rounded-xl bg-red-50 text-brand-red flex items-center justify-center font-bold">
                                         <Layers size={18} />
@@ -1038,14 +1144,23 @@ export const DocsPage: React.FC<DocsPageProps> = ({ embedded = false }) => {
 
                             {/* SECTION 14: TROUBLESHOOTING & FAQS */}
                             <section id="faqs" className="scroll-mt-6 bg-white p-6 sm:p-8 rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                                <div className="flex items-center gap-3 border-b border-gray-100 pb-4 mb-5">
-                                    <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center font-bold">
-                                        <HelpCircle size={18} />
+                                <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-5 flex-wrap gap-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center font-bold">
+                                            <HelpCircle size={18} />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg sm:text-xl font-bold text-gray-900">14. Troubleshooting & Frequently Asked Questions (FAQ)</h2>
+                                            <p className="text-xs text-gray-500 font-medium">Common operational questions and edge cases.</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h2 className="text-lg sm:text-xl font-bold text-gray-900">14. Troubleshooting & Frequently Asked Questions (FAQ)</h2>
-                                        <p className="text-xs text-gray-500 font-medium">Common operational questions and edge cases.</p>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={toggleAllFaqs}
+                                        className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 hover:text-gray-900 rounded-lg transition-colors cursor-pointer print:hidden"
+                                    >
+                                        {allFaqsExpanded ? 'Collapse All' : 'Expand All FAQs'}
+                                    </button>
                                 </div>
 
                                 <div className="space-y-2.5">
@@ -1076,7 +1191,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({ embedded = false }) => {
                                             a: 'A Customer Circuit ID is the service tag referenced on customer contracts and invoices. A Supplier Circuit ID is the identifier assigned by the upstream wholesale carrier (e.g. Airtel, Tata). EdgeStone links both so you can resolve issues quickly with both parties.'
                                         }
                                     ].map((item) => {
-                                        const isOpen = expandedFaq === item.id;
+                                        const isOpen = expandedFaq === item.id || allFaqsExpanded;
                                         return (
                                             <div key={item.id} className="border border-gray-200/80 rounded-xl overflow-hidden bg-white">
                                                 <button
@@ -1086,11 +1201,15 @@ export const DocsPage: React.FC<DocsPageProps> = ({ embedded = false }) => {
                                                     <span>{item.q}</span>
                                                     <ChevronDown
                                                         size={15}
-                                                        className={`text-gray-400 transition-transform duration-200 shrink-0 ml-2 ${isOpen ? 'rotate-180 text-brand-red' : ''}`}
+                                                        className={`text-gray-400 transition-transform duration-200 shrink-0 ml-2 print:hidden ${isOpen ? 'rotate-180 text-brand-red' : ''}`}
                                                     />
                                                 </button>
-                                                {isOpen && (
-                                                    <div className="px-3.5 pb-3.5 pt-1 text-xs text-gray-600 leading-relaxed border-t border-gray-100 bg-gray-50/50">
+                                                {isOpen ? (
+                                                    <div className="px-3.5 pb-3.5 pt-1 text-xs text-gray-600 leading-relaxed border-t border-gray-100 bg-gray-50/50 print:block">
+                                                        {item.a}
+                                                    </div>
+                                                ) : (
+                                                    <div className="hidden print:block px-3.5 pb-3.5 pt-1 text-xs text-gray-600 leading-relaxed border-t border-gray-100 bg-gray-50/50">
                                                         {item.a}
                                                     </div>
                                                 )}
@@ -1111,13 +1230,24 @@ export const DocsPage: React.FC<DocsPageProps> = ({ embedded = false }) => {
                                         Developed and maintained by AeroTalk Engineering. All operational guidelines apply to active shifts.
                                     </p>
                                 </div>
-                                <button
-                                    onClick={handlePrint}
-                                    className="px-3.5 py-1.5 bg-brand-red hover:bg-red-600 text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 shadow-2xs shrink-0 print:hidden"
-                                >
-                                    <Printer size={13} />
-                                    <span>Export Printable Manual</span>
-                                </button>
+                                <div className="flex items-center gap-2 print:hidden">
+                                    <button
+                                        onClick={handleDownloadPDF}
+                                        className="px-4 py-2 bg-brand-red hover:bg-brand-red-hover text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-95"
+                                        title="Download complete user manual as PDF"
+                                    >
+                                        <Download size={14} />
+                                        <span>Download PDF Manual</span>
+                                    </button>
+                                    <button
+                                        onClick={handlePrint}
+                                        className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl transition-all border border-gray-200 flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+                                        title="Print Manual"
+                                    >
+                                        <Printer size={13} />
+                                        <span>Print</span>
+                                    </button>
+                                </div>
                             </div>
                         </main>
                     </div>

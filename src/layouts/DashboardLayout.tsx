@@ -123,7 +123,7 @@ const DashboardLayout: React.FC = () => {
             <DashboardDataProvider>
                 <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                     {/* Mobile Header */}
-                    <header className="lg:hidden flex items-center justify-between px-4 h-16 border-b border-gray-100 bg-white flex-shrink-0">
+                    <header className="lg:hidden flex items-center justify-between px-4 h-16 border-b border-gray-100 bg-white flex-shrink-0 print:hidden">
                         <img src="/assets/logo.png" alt="EdgeStone" className="h-8 w-auto" />
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
@@ -153,7 +153,7 @@ const DashboardLayout: React.FC = () => {
             />
 
             {/* Unified FAB Menu */}
-            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end print:hidden">
                 {/* Floating Action Menu Stack */}
                 <div 
                     className={`flex flex-col items-end gap-3 mb-4 transition-all duration-300 origin-bottom ${

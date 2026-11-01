@@ -44,7 +44,7 @@ export const Topbar: React.FC<TopbarProps> = ({
     };
 
     return (
-        <div className="sticky top-0 z-20 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 px-4 sm:px-8 py-4 sm:py-6 bg-white/80 backdrop-blur-md border-b border-gray-100">
+        <div className="sticky top-0 z-20 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 px-4 sm:px-8 py-4 sm:py-6 bg-white/80 backdrop-blur-md border-b border-gray-100 print:hidden">
             <h1 className="text-lg sm:text-xl font-bold text-gray-700 truncate sm:min-w-[120px]">{title}</h1>
 
             {showSearch && (

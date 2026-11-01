@@ -94,3 +94,114 @@
         background-color: #f1f5f9;
     }
 }
+
+/* ==========================================================================
+   High-Fidelity Print & PDF Generation Styles
+   Ensures complete manuals, reports, and multi-page documents print without
+   viewport clipping, container overflow restrictions, or missing sections.
+   ========================================================================== */
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 12mm 14mm;
+    }
+
+    html, body, #root {
+        height: auto !important;
+        min-height: 100% !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        color: #111827 !important;
+    }
+
+    /* Override all viewport constraints and scroll containers */
+    .h-screen,
+    .h-full,
+    .overflow-hidden,
+    .overflow-y-auto,
+    .overflow-x-auto,
+    main,
+    [class*="min-h-screen"],
+    [class*="h-full"] {
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        position: static !important;
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        background: transparent !important;
+    }
+
+    /* Hide app chrome, navigations, sidebars, topbars, floating tools */
+    aside:not(.print-include),
+    header:not(.print-header),
+    nav:not(.print-nav),
+    .print\:hidden,
+    .sidebar,
+    .topbar,
+    [class*="Sidebar"],
+    [class*="Topbar"],
+    [class*="Calculator"],
+    [class*="GlobalStickyNote"],
+    [class*="fixed bottom"] {
+        display: none !important;
+    }
+
+    /* Force high-fidelity color and background printing */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Professional manual section card formatting in print */
+    main section {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        box-shadow: none !important;
+        border: 1px solid #e2e8f0 !important;
+        padding: 24px !important;
+        border-radius: 12px !important;
+        margin-bottom: 24px !important;
+        background: #ffffff !important;
+    }
+
+    /* Ensure tables inside manual print cleanly */
+    main table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+    main table th, main table td {
+        border: 1px solid #e2e8f0 !important;
+    }
+
+    /* Page break helpers */
+    .print-avoid-break {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .print-break-before {
+        break-before: page !important;
+        page-break-before: always !important;
+    }
+
+    .print-break-after {
+        break-after: page !important;
+        page-break-after: always !important;
+    }
+
+    /* Show elements that should only appear in print */
+    .print-only {
+        display: block !important;
+    }
+
+    /* Force full grid width in print */
+    .print-full-width {
+        width: 100% !important;
+        max-width: 100% !important;
+        grid-column: span 12 / span 12 !important;
+    }
+}
