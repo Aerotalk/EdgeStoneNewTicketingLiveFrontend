@@ -93,6 +93,21 @@
     .edgestone-table tr:hover td {
         background-color: #f1f5f9;
     }
+
+    /* Modal float-out from bottom-right FAB to screen center */
+    @keyframes floatOutFromFab {
+        0% {
+            opacity: 0;
+            transform: translate3d(18vw, 18vh, 0) scale(0.65);
+        }
+        100% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+        }
+    }
+    .animate-float-out {
+        animation: floatOutFromFab 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
 }
 
 /* ==========================================================================

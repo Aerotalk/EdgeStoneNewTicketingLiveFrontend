@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useParams, Navigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { Plus, Calculator as CalcIcon, Edit3 } from 'lucide-react';
+import { Plus, Calculator as CalcIcon, FileText } from 'lucide-react';
 import { Sidebar } from '../components/ui/Sidebar';
 import { Calculator } from '../components/ui/Calculator';
 import { GlobalStickyNote } from '../components/ui/GlobalStickyNote';
@@ -162,15 +162,15 @@ const DashboardLayout: React.FC = () => {
                             : 'opacity-0 scale-75 translate-y-8 pointer-events-none absolute'
                     }`}
                 >
-                    {/* Shift Handover (Sticky Note) Button */}
+                    {/* Shift Handover Button */}
                     <div className="flex items-center gap-3 group cursor-pointer" onClick={() => { setActiveWidget(activeWidget === 'stickynote' ? null : 'stickynote'); setIsMenuOpen(false); }}>
                         <span className="opacity-0 group-hover:opacity-100 bg-slate-900 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg shadow-lg transition-opacity duration-200 whitespace-nowrap border border-slate-800">
                             Shift Handover
                         </span>
                         <button
-                            className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/20 hover:scale-110 active:scale-95 transition-all duration-200"
+                            className="w-12 h-12 bg-slate-900 hover:bg-slate-800 text-white rounded-full flex items-center justify-center shadow-lg shadow-slate-900/30 hover:scale-110 active:scale-95 transition-all duration-200 border border-slate-700/80"
                         >
-                            <Edit3 size={20} strokeWidth={2.5} />
+                            <FileText size={19} strokeWidth={2.2} />
                         </button>
                     </div>
 
