@@ -1121,9 +1121,27 @@ const CircuitsPage: React.FC = () => {
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 text-sm font-semibold text-gray-700">
-                                                    {circuit.client?.name
-                                                        ? <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400" />{circuit.client.name}</span>
-                                                        : <span className="text-gray-400 font-normal italic">None</span>}
+                                                    {(() => {
+                                                        const clientObj = circuit.client || clients.find(c => c.id === circuit.clientId);
+                                                        if (!clientObj?.name) return <span className="text-gray-400 font-normal italic">None</span>;
+
+                                                        const clientEmail = (clientObj.emails && clientObj.emails.length > 0 ? clientObj.emails[0] : null)
+                                                            || (clients.find(c => (circuit.clientId && c.id === circuit.clientId) || (clientObj.id && c.id === clientObj.id) || (c.name.toLowerCase() === clientObj.name.toLowerCase()))?.emails?.[0]);
+
+                                                        return (
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                                                                    <span className="text-gray-800 font-semibold">{clientObj.name}</span>
+                                                                </div>
+                                                                {clientEmail && (
+                                                                    <p className="text-[11px] text-gray-400 font-normal pl-4 truncate max-w-[200px]" title={clientEmail}>
+                                                                        {clientEmail}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-gray-600">
                                                     {circuit.isMultiVendor 
