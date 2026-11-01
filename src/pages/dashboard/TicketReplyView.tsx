@@ -2325,38 +2325,47 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
             )}
             {/* Email Modal */}
             {showEmailModal && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-[#0F172A]/20 backdrop-blur-[6px] animate-in fade-in duration-500">
-                    <div className="bg-white rounded-[32px] w-full max-w-[650px] max-h-[90vh] shadow-[0_32px_128px_-12px_rgba(15,23,42,0.25)] border border-gray-100/50 animate-in zoom-in-95 duration-300 flex flex-col overflow-hidden">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 bg-slate-950/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-[960px] max-h-[92vh] shadow-[0_24px_80px_-16px_rgba(15,23,42,0.22)] border border-slate-200/90 animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
                         {/* Modal Header */}
-                        <div className="px-10 py-8 border-b border-gray-50 flex items-center justify-between bg-white relative">
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm">
-                                    <Mail size={20} />
+                                <div className="w-9 h-9 bg-orange-50 border border-orange-200/80 rounded-xl flex items-center justify-center text-orange-600 shadow-2xs flex-shrink-0">
+                                    <Mail size={18} />
                                 </div>
                                 <div>
-                                    <h3 className="text-[18px] font-bold text-gray-900 leading-none mb-1">Send Email</h3>
-                                    <p className="text-[12px] text-gray-400 font-medium">Communicating with {activeTab.startsWith('vendor') ? 'Vendor' : 'Client'}</p>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-[16px] font-bold text-slate-900 leading-tight">Send Email</h3>
+                                        <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70">
+                                            {ticket.ticketId ? (ticket.ticketId.startsWith('#') ? ticket.ticketId : `#${ticket.ticketId}`) : ''}
+                                        </span>
+                                    </div>
+                                    <p className="text-[12px] text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                                        Communicating with <span className="font-semibold text-slate-700">{activeTab.startsWith('vendor') ? 'Vendor' : 'Client'}</span>
+                                    </p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setShowEmailModal(false)}
-                                className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-full transition-all"
+                                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
+                                title="Close (Esc)"
                             >
-                                <X size={20} />
+                                <X size={18} />
                             </button>
                         </div>
 
                         {/* Modal Body */}
-                        <div className="p-10 space-y-6 overflow-y-auto flex-1 scrollbar-hide">
+                        <div className="p-6 space-y-4 overflow-y-auto flex-1">
                             {/* Email Fields */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-4 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl group focus-within:ring-4 focus-within:ring-gray-900/5 focus-within:border-gray-200 transition-all">
-                                    <span className="text-[13px] font-bold text-gray-400 uppercase tracking-wider w-12">From</span>
+                            <div className="space-y-2.5">
+                                <div className="flex items-center gap-3 px-4 py-2 bg-slate-50/70 border border-slate-200/90 rounded-xl group focus-within:ring-2 focus-within:ring-orange-100 focus-within:border-orange-400 focus-within:bg-white transition-all min-h-[46px]">
+                                    <span className="text-[11.5px] font-bold text-slate-400 uppercase tracking-wider w-14 flex-shrink-0 font-mono">From</span>
                                     <input
                                         type="email"
                                         value={emailForm.from}
                                         onChange={(e) => setEmailForm(prev => ({ ...prev, from: e.target.value }))}
-                                        className="flex-1 bg-transparent border-none focus:ring-0 text-[14px] font-bold text-gray-900 placeholder:text-gray-300"
+                                        className="flex-1 bg-transparent border-none focus:ring-0 text-[13.5px] font-semibold text-slate-900 placeholder:text-slate-300 p-0 outline-none"
                                     />
                                 </div>
 
@@ -2370,22 +2379,22 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                         <button
                                             type="button"
                                             onClick={() => setShowCc(!showCc)}
-                                            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 flex-shrink-0 text-[12px] font-bold ${
+                                            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 flex-shrink-0 text-[12px] font-semibold ${
                                                 showCc
-                                                    ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                                                    : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                                                    ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border border-orange-200'
+                                                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-transparent'
                                             }`}
                                             title={showCc ? "Hide Cc/Bcc" : "Add Cc/Bcc"}
                                         >
-                                            {showCc ? <Minus size={14} /> : <Plus size={14} />}
-                                            <span>Cc/Bcc</span>
+                                            {showCc ? <Minus size={13} /> : <Plus size={13} />}
+                                            <span>Cc / Bcc</span>
                                         </button>
                                     }
                                 />
 
                                 {showCc && (
                                     <>
-                                        <div className="animate-in slide-in-from-top-2 duration-300">
+                                        <div className="animate-in slide-in-from-top-2 duration-200">
                                             <EmailRecipientAutocomplete
                                                 label="Cc"
                                                 recipients={emailForm.cc}
@@ -2395,7 +2404,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                             />
                                         </div>
 
-                                        <div className="animate-in slide-in-from-top-2 duration-300">
+                                        <div className="animate-in slide-in-from-top-2 duration-200">
                                             <EmailRecipientAutocomplete
                                                 label="Bcc"
                                                 recipients={emailForm.bcc}
@@ -2408,30 +2417,30 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                 )}
 
                                 <div
-                                    className="flex items-center gap-4 px-4 py-3 bg-gray-100/70 border border-gray-200/80 rounded-2xl select-none cursor-not-allowed transition-all"
+                                    className="flex items-center gap-3 px-4 py-2 bg-slate-100/70 border border-slate-200/90 rounded-xl select-none cursor-not-allowed transition-all min-h-[46px]"
                                     title="Subject is locked to preserve email thread integrity"
                                 >
-                                    <span className="text-[13px] font-bold text-gray-400 uppercase tracking-wider w-12 flex-shrink-0">Subject</span>
+                                    <span className="text-[11.5px] font-bold text-slate-400 uppercase tracking-wider w-14 flex-shrink-0 font-mono">Subject</span>
                                     <input
                                         type="text"
                                         readOnly
                                         disabled
                                         tabIndex={-1}
                                         value={emailForm.subject || getLockedSubject(activeTab)}
-                                        className="flex-1 bg-transparent border-none focus:ring-0 text-[14px] font-bold text-gray-700 cursor-not-allowed select-all outline-none"
+                                        className="flex-1 bg-transparent border-none focus:ring-0 text-[13.5px] font-semibold text-slate-800 cursor-not-allowed select-all outline-none p-0 truncate"
                                     />
                                     <div
-                                        className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-200/70 text-gray-500 rounded-lg text-[11px] font-bold tracking-wide flex-shrink-0"
+                                        className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-200/80 text-slate-600 rounded-md text-[11px] font-semibold tracking-wide flex-shrink-0 border border-slate-300/60"
                                         title="Subject cannot be changed mid-conversation"
                                     >
-                                        <Lock size={12} className="text-gray-400" />
+                                        <Lock size={11} className="text-slate-500" />
                                         <span>Locked</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Outlook-Grade Rich Mail Composer */}
-                            <div className="flex flex-col bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs">
+                            {/* Outlook-Grade Rich Mail Composer & Attachments Container */}
+                            <div className="flex flex-col bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-2xs focus-within:border-slate-300 transition-colors">
                                 <RichMailComposer
                                     valueHtml={replyHtml}
                                     onChange={(html, plainText) => {
@@ -2440,8 +2449,9 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                     }}
                                     placeholder="Type your message here... (You can paste tables directly from Outlook, Excel, or Word)"
                                     signatureHtml={signatureHtml}
-                                    minHeight="200px"
+                                    minHeight="260px"
                                     autoFocus
+                                    className="border-none rounded-none shadow-none"
                                 />
 
                                 <input
@@ -2452,18 +2462,22 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                     multiple
                                 />
 
-                                <div className="flex items-center gap-3 px-5 py-3 bg-gray-50/80 border-t border-gray-200 flex-shrink-0">
+                                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50/80 border-t border-slate-200/80 flex-shrink-0">
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="px-3 py-1.5 text-gray-600 hover:text-orange-600 hover:bg-white rounded-lg transition-all flex items-center gap-2 border border-gray-200 bg-white/90 shadow-2xs text-[12px] font-semibold"
+                                        className="px-3 py-1.5 text-slate-700 hover:text-orange-600 hover:bg-white rounded-lg transition-all flex items-center gap-2 border border-slate-200 bg-white/90 shadow-2xs text-[12px] font-semibold"
                                         title="Attach files (Max 20MB per file, up to 10 files)"
                                     >
                                         <Paperclip size={14} />
                                         <span>Attach files</span>
-                                        <span className="text-[11px] text-gray-400 font-normal">(Max 20MB)</span>
-                                        {attachments.length > 0 && <span className="text-[11px] font-bold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full">{attachments.length}/10</span>}
+                                        <span className="text-[11px] text-slate-400 font-normal">(Max 20MB)</span>
+                                        {attachments.length > 0 && <span className="text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.2 rounded-full">{attachments.length}/10</span>}
                                     </button>
+
+                                    <span className="text-[11px] text-slate-400 hidden sm:inline">
+                                        Supports rich text, inline images, and direct table copy-paste from Excel/Word
+                                    </span>
                                 </div>
                             </div>
 
@@ -2471,14 +2485,14 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                             {attachments.length > 0 && (
                                 <div className="flex flex-wrap gap-2 pt-1">
                                     {attachments.map((file, i) => (
-                                        <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200/80 rounded-xl shadow-2xs">
-                                            <Paperclip size={12} className="text-gray-400" />
-                                            <span className="text-[11px] font-bold text-gray-700 truncate max-w-[180px]">{file.name}</span>
-                                            <span className="text-[10px] text-gray-400 font-medium">({formatFileSize(file.size)})</span>
+                                        <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl shadow-2xs">
+                                            <Paperclip size={12} className="text-slate-400" />
+                                            <span className="text-[11.5px] font-medium text-slate-700 truncate max-w-[240px] font-mono">{file.name}</span>
+                                            <span className="text-[10px] text-slate-400 font-medium">({formatFileSize(file.size)})</span>
                                             <button 
                                                 type="button"
                                                 onClick={() => removeAttachment(i)} 
-                                                className="text-gray-400 hover:text-red-500 p-0.5 rounded hover:bg-red-50 transition-colors"
+                                                className="text-slate-400 hover:text-rose-600 p-0.5 rounded hover:bg-rose-50 transition-colors ml-1"
                                                 title="Remove file"
                                             >
                                                 <X size={12} />
@@ -2490,36 +2504,35 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="px-10 py-8 bg-gray-50/50 border-t border-gray-50 flex items-center justify-between">
-                            {/* Left: Signatures Dropdown — exactly like Outlook toolbar */}
+                        <div className="px-6 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between flex-shrink-0">
+                            {/* Left: Signatures Dropdown */}
                             <div className="relative">
                                 <button
                                     id="signature-picker-btn"
                                     onClick={() => setShowSigDropdown(v => !v)}
-                                    className="flex items-center gap-2 px-3 py-2 text-[13px] font-semibold text-gray-600 hover:text-gray-900 hover:bg-white border border-transparent hover:border-gray-200 rounded-xl transition-all"
+                                    className="flex items-center gap-2 px-3 py-2 text-[12.5px] font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl shadow-2xs transition-all"
                                     title="Insert signature"
                                 >
-                                    <PenLine size={15} />
-                                    <span className="max-w-[140px] truncate">
+                                    <PenLine size={14} className="text-slate-500" />
+                                    <span className="max-w-[180px] truncate">
                                         {activeSignatureId
                                             ? (signatures.find(s => s.id === activeSignatureId)?.name || 'Signature')
                                             : 'Signatures'}
                                     </span>
-                                    <ChevronDown size={13} className="text-gray-400 flex-shrink-0" />
+                                    <ChevronDown size={13} className="text-slate-400 flex-shrink-0" />
                                 </button>
 
                                 {showSigDropdown && (
                                     <>
                                         <div className="fixed inset-0 z-[220]" onClick={() => setShowSigDropdown(false)} />
-                                        <div className="absolute left-0 bottom-full mb-2 bg-white border border-gray-100 rounded-2xl shadow-[0_20px_60px_-8px_rgba(15,23,42,0.2)] z-[230] min-w-[220px] py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                                            {/* Signature list */}
+                                        <div className="absolute left-0 bottom-full mb-2 bg-white border border-slate-200/90 rounded-2xl shadow-[0_20px_60px_-8px_rgba(15,23,42,0.18)] z-[230] min-w-[240px] py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
                                             {signatures.length > 0 ? (
                                                 <>
                                                     {signatures.map(sig => (
                                                         <button
                                                             key={sig.id}
                                                             onClick={() => { applySignature(sig); setShowSigDropdown(false); }}
-                                                            className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 transition-all flex items-center justify-between gap-3"
+                                                            className="w-full text-left px-4 py-2 text-[12.5px] font-semibold text-slate-700 hover:bg-slate-50 transition-all flex items-center justify-between gap-3"
                                                         >
                                                             <span className="truncate">{sig.name}</span>
                                                             {activeSignatureId === sig.id && (
@@ -2529,45 +2542,45 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                                                     ))}
                                                     <button
                                                         onClick={() => { applySignature(null); setShowSigDropdown(false); }}
-                                                        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-400 hover:bg-gray-50 transition-all"
+                                                        className="w-full text-left px-4 py-2 text-[12.5px] font-semibold text-slate-400 hover:bg-slate-50 transition-all"
                                                     >
                                                         (No signature)
                                                     </button>
-                                                    <div className="h-px bg-gray-100 mx-3 my-1" />
+                                                    <div className="h-px bg-slate-100 mx-3 my-1" />
                                                 </>
                                             ) : (
-                                                <p className="px-4 py-2 text-[12px] text-gray-400">No signatures yet</p>
+                                                <p className="px-4 py-2 text-[12px] text-slate-400">No signatures yet</p>
                                             )}
-                                            {/* Signatures settings link */}
                                             <button
                                                 onClick={() => {
                                                     setShowSigDropdown(false);
                                                     setShowSignatureModal(true);
                                                 }}
-                                                className="w-full text-left px-4 py-2.5 text-[13px] font-bold text-orange-500 hover:bg-orange-50 transition-all flex items-center gap-2"
+                                                className="w-full text-left px-4 py-2 text-[12.5px] font-bold text-orange-600 hover:bg-orange-50 transition-all flex items-center gap-2"
                                             >
                                                 <PenLine size={13} />
-                                                Signatures...
+                                                Manage Signatures...
                                             </button>
                                         </div>
                                     </>
                                 )}
                             </div>
 
-                            <div className="flex items-center gap-4">
+                            {/* Right: Discard & Send Button */}
+                            <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => setShowEmailModal(false)}
-                                    className="px-6 py-2.5 text-[14px] font-bold text-gray-500 hover:bg-white rounded-xl transition-all border border-transparent hover:border-gray-100"
+                                    className="px-4 py-2 text-[13px] font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-xl transition-all"
                                 >
                                     Discard
                                 </button>
                                 <button
                                     onClick={handleSendReply}
                                     disabled={(!replyHtml.trim() && !replyText.trim() && !signatureHtml && attachments.length === 0) || isSending || !(emailForm.subject.trim() || getLockedSubject(activeTab))}
-                                    className="flex items-center gap-2.5 px-8 py-3 bg-orange-500 text-white rounded-xl text-[15px] font-bold hover:bg-orange-600 transition-all active:scale-[0.98] shadow-[0_20px_40px_-12px_rgba(249,115,22,0.3)] disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed group"
+                                    className="flex items-center gap-2 px-6 py-2.5 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 text-white rounded-xl text-[13.5px] font-bold transition-all active:scale-[0.99] shadow-xs hover:shadow-md disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed group"
                                 >
                                     <span>{isSending ? 'Sending...' : 'Send Message'}</span>
-                                    {!isSending && <Send size={18} className="group-hover:translate-x-1 transition-transform" />}
+                                    {!isSending && <Send size={15} className="group-hover:translate-x-0.5 transition-transform" />}
                                 </button>
                             </div>
                         </div>

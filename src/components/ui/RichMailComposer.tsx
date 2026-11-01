@@ -31,6 +31,7 @@ interface RichMailComposerProps {
     minHeight?: string;
     autoFocus?: boolean;
     disabled?: boolean;
+    className?: string;
 }
 
 // Curated Outlook-grade color swatches
@@ -62,7 +63,8 @@ export const RichMailComposer: React.FC<RichMailComposerProps> = ({
     signatureHtml,
     minHeight = '180px',
     autoFocus = false,
-    disabled = false
+    disabled = false,
+    className
 }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const [showColorPicker, setShowColorPicker] = useState(false);
@@ -418,7 +420,7 @@ export const RichMailComposer: React.FC<RichMailComposerProps> = ({
     };
 
     return (
-        <div className="flex flex-col bg-white border border-gray-200/90 rounded-[20px] shadow-xs overflow-hidden transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500/40">
+        <div className={`flex flex-col bg-white overflow-hidden transition-all ${className || 'border border-slate-200/90 rounded-xl shadow-2xs focus-within:border-slate-300'}`}>
             {/* Outlook-Style Formatting Ribbon / Toolbar */}
             <div className="flex flex-wrap items-center gap-1 px-4 py-2 bg-[#f8fafc] border-b border-gray-200/80 select-none text-gray-700">
                 {/* History */}

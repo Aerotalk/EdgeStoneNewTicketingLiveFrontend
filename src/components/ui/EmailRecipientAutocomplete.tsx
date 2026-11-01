@@ -201,9 +201,9 @@ export const EmailRecipientAutocomplete: React.FC<EmailRecipientAutocompleteProp
         <div ref={containerRef} className="relative w-full">
             <div
                 onClick={() => inputRef.current?.focus()}
-                className="flex items-center gap-4 px-4 py-2 bg-gray-50 border border-gray-100 rounded-2xl group focus-within:ring-4 focus-within:ring-gray-900/5 focus-within:border-gray-200 transition-all min-h-[52px] cursor-text"
+                className="flex items-center gap-3 px-4 py-2 bg-slate-50/70 border border-slate-200/90 rounded-xl group focus-within:ring-2 focus-within:ring-orange-100 focus-within:border-orange-400 focus-within:bg-white transition-all min-h-[46px] cursor-text"
             >
-                <span className="text-[13px] font-bold text-gray-400 uppercase tracking-wider w-12 flex-shrink-0 select-none">
+                <span className="text-[11.5px] font-bold text-slate-400 uppercase tracking-wider w-14 flex-shrink-0 select-none font-mono">
                     {label}
                 </span>
 
@@ -211,16 +211,16 @@ export const EmailRecipientAutocomplete: React.FC<EmailRecipientAutocompleteProp
                     {recipients.map((email, i) => (
                         <div
                             key={`${email}-${i}`}
-                            className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg shadow-sm animate-in zoom-in-95 duration-200"
+                            className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white border border-slate-200/90 rounded-md shadow-2xs animate-in zoom-in-95 duration-150"
                         >
-                            <span className="text-[13px] font-bold text-gray-900">{email}</span>
+                            <span className="text-[12.5px] font-semibold text-slate-800 font-mono">{email}</span>
                             <button
                                 type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onRemoveRecipient(i);
                                 }}
-                                className="text-gray-400 hover:text-red-500 transition-colors p-0.5 rounded"
+                                className="text-slate-400 hover:text-rose-600 transition-colors p-0.5 rounded"
                                 title="Remove recipient"
                             >
                                 <X size={12} />
@@ -245,7 +245,7 @@ export const EmailRecipientAutocomplete: React.FC<EmailRecipientAutocompleteProp
                                 handleCommitRawInput(false);
                             }, 180);
                         }}
-                        className="flex-1 min-w-[130px] bg-transparent border-none focus:ring-0 text-[14px] font-bold text-gray-900 placeholder:text-gray-300 py-1 outline-none"
+                        className="flex-1 min-w-[130px] bg-transparent border-none focus:ring-0 text-[13.5px] font-semibold text-slate-900 placeholder:text-slate-400 py-1 outline-none p-0"
                     />
 
                     {inputValue.trim().length > 0 && (
@@ -282,9 +282,9 @@ export const EmailRecipientAutocomplete: React.FC<EmailRecipientAutocompleteProp
 
             {/* Outlook-Style Suggestions Dropdown */}
             {isOpen && (suggestions.length > 0 || (inputValue.trim() && isValidEmail(inputValue.trim().replace(/[,;]$/, '')))) && (
-                <div className="absolute top-full left-0 right-0 mt-1.5 z-[300] bg-white rounded-2xl shadow-[0_16px_48px_rgba(15,23,42,0.18)] border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-3.5 py-2 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                <div className="absolute top-full left-0 right-0 mt-1.5 z-[300] bg-white rounded-xl shadow-[0_16px_48px_rgba(15,23,42,0.16)] border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                             {inputValue ? 'Matching Contacts' : 'Outlook Recent & Suggested Contacts'}
                         </span>
                         {isLoading && (
