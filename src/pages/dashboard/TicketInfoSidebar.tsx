@@ -1,5 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, Ticket as TicketIcon, X, Send, Trash2, CheckCircle, Plus, Calendar, Clock, AlertTriangle, Loader2 } from 'lucide-react';
+import { 
+    ChevronUp, 
+    ChevronDown, 
+    Ticket as TicketIcon, 
+    X, 
+    Send, 
+    Trash2, 
+    CheckCircle, 
+    Plus, 
+    Calendar, 
+    Clock, 
+    AlertTriangle, 
+    Loader2,
+    Copy,
+    Check
+} from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { nowDateIST, nowTimeIST, formatDateWithTZ, formatTimeWithTZ } from '../../utils/dateUtils';
 import { getAuthHeaders, API_URL_SLA } from '../../types/sla';
@@ -85,6 +100,20 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({
     const [notes, setNotes] = useState<Note[]>([]);
     const [newNote, setNewNote] = useState('');
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+
+    const [isSlaCollapsed, setIsSlaCollapsed] = useState(false);
+    const [isActivityCollapsed, setIsActivityCollapsed] = useState(false);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
+
+    const handleCopy = (text: string, label: string) => {
+        if (!text || text === '-' || text === 'None') return;
+        navigator.clipboard.writeText(text);
+        setCopiedField(label);
+        toast.success(`${label} copied to clipboard`);
+        setTimeout(() => {
+            setCopiedField(null);
+        }, 2000);
+    };
 
     const [slaId, setSlaId] = useState('');
     const [slaCloseDate, setSlaCloseDate] = useState('');
@@ -501,41 +530,72 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({
     const dynamicSlaClose = getDynamicSlaTime(slaCloseDate, slaCloseTime);
 
     return (
-        <div className="w-full lg:w-[340px] border-t lg:border-t-0 border-l-0 lg:border-l border-gray-100 bg-white flex flex-col h-auto lg:h-full font-sans shrink-0 relative">
+        <div className="w-full lg:w-[350px] border-t lg:border-t-0 border-l-0 lg:border-l border-slate-200/80 bg-white flex flex-col h-auto lg:h-full font-sans shrink-0 relative">
             <div className="flex-1 overflow-y-auto scrollbar-hide">
-                {/* Profile Section */}
-                <div className="p-8 border-b border-gray-50">
-                    <div className="flex items-center gap-4 mb-10">
-                        <div className="w-16 h-16 rounded-full bg-[#E5DCC3] flex items-center justify-center text-[#5C5648] font-bold text-2xl shadow-sm flex-shrink-0">
-                            {activeTab?.startsWith('vendor') ? (vendorName ? vendorName.slice(0, 2).toUpperCase() : 'VN') : (clientName ? clientName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : ticket.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2))}
+                {/* Customer / Vendor Profile Header */}
+                <div className="p-5 border-b border-slate-100 bg-white">
+                    <div className="flex items-start gap-3.5">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-300/70 flex items-center justify-center text-slate-700 font-bold text-sm shadow-2xs flex-shrink-0 mt-0.5">
+                            {activeTab?.startsWith('vendor') 
+                                ? (vendorName ? vendorName.slice(0, 2).toUpperCase() : 'VN') 
+                                : (clientName ? clientName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : ticket.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2))
+                            }
                         </div>
-                        <div className="flex flex-col min-w-0">
-                            <h3 className="text-[20px] font-bold text-gray-900 leading-tight truncate">
+                        <div className="flex flex-col min-w-0 flex-1">
+                            <h3 className="text-[15.5px] font-bold text-slate-900 leading-snug break-words" title={
+                                activeTab?.startsWith('vendor') ? (vendorName || 'EdgeStone Vendor') : (clientName || ticket.name)
+                            }>
                                 {activeTab?.startsWith('vendor') ? (vendorName || 'EdgeStone Vendor') : (clientName || ticket.name)}
                             </h3>
-                            <p className="text-[13px] text-gray-500 font-medium mt-0.5 truncate">
-                                {activeTab?.startsWith('vendor') ? (vendorEmail || (ticket.vendor?.emails ? ticket.vendor.emails.join(', ') : (ticket.ticketType === 'Vendor' ? ticket.email : 'Fetching vendor...'))) : (clientEmail || (ticket.client?.emails ? ticket.client.emails.join(', ') : ticket.email))}
-                            </p>
+                            {(() => {
+                                const emailStr = activeTab?.startsWith('vendor') 
+                                    ? (vendorEmail || (ticket.vendor?.emails ? ticket.vendor.emails.join(', ') : (ticket.ticketType === 'Vendor' ? ticket.email : 'Fetching vendor...'))) 
+                                    : (clientEmail || (ticket.client?.emails ? ticket.client.emails.join(', ') : ticket.email));
+                                return (
+                                    <div 
+                                        className="flex items-center gap-1.5 mt-1 group/email cursor-pointer"
+                                        onClick={() => handleCopy(emailStr, 'Email')}
+                                        title="Click to copy email"
+                                    >
+                                        <p className="text-[12px] text-slate-500 font-medium truncate flex-1 hover:text-slate-800 transition-colors">
+                                            {emailStr}
+                                        </p>
+                                        {copiedField === 'Email' ? (
+                                            <Check size={13} className="text-emerald-600 flex-shrink-0" />
+                                        ) : (
+                                            <Copy size={13} className="text-slate-400 group-hover/email:text-slate-700 flex-shrink-0 opacity-0 group-hover/email:opacity-100 transition-opacity" />
+                                        )}
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
+                </div>
 
-                    <div className="space-y-5">
-                        <div className="flex justify-between items-center text-[14px]">
-                            <span className="text-gray-400 font-medium">Profile</span>
-                            <span className="text-gray-600 font-bold">{activeTab?.startsWith('vendor') ? 'Vendor' : 'Customer'}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[14px]">
-                            <span className="text-gray-400 font-medium">Date</span>
-                            <span className="text-gray-600 font-bold">
-                                {formatDateWithTZ(ticket.createdAt || ticket.date || '', slaTimeZone, { day: 'numeric', month: 'short', year: 'numeric' })}
+                {/* Ticket Properties Inset Card */}
+                <div className="p-4 border-b border-slate-100">
+                    <div className="bg-slate-50/70 border border-slate-200/70 rounded-xl p-3.5 space-y-3">
+                        {/* Profile Type */}
+                        <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200/50">
+                            <span className="text-slate-400 font-semibold uppercase tracking-wider text-[11px]">Profile</span>
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white text-slate-700 border border-slate-200/80 shadow-2xs">
+                                {activeTab?.startsWith('vendor') ? 'Vendor' : 'Customer'}
                             </span>
                         </div>
-                        <div className="flex justify-between items-center text-[14px]">
-                            <span className="text-gray-400 font-medium">Time</span>
-                            <span className="text-gray-600 font-bold">{formatTimeWithTZ(ticket.receivedAt || ticket.createdAt || new Date(), slaTimeZone)} hrs</span>
+
+                        {/* Created Date & Time */}
+                        <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200/50">
+                            <span className="text-slate-400 font-semibold uppercase tracking-wider text-[11px]">Created</span>
+                            <span className="text-slate-700 font-bold text-[12px]">
+                                {formatDateWithTZ(ticket.createdAt || ticket.date || '', slaTimeZone, { day: 'numeric', month: 'short', year: 'numeric' })}
+                                <span className="text-slate-400 font-normal mx-1">•</span>
+                                {formatTimeWithTZ(ticket.receivedAt || ticket.createdAt || new Date(), slaTimeZone)} hrs
+                            </span>
                         </div>
-                        <div className="flex justify-between items-center text-[14px]">
-                            <span className="text-gray-400 font-medium">Priority</span>
+
+                        {/* Priority Dropdown */}
+                        <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200/50">
+                            <span className="text-slate-400 font-semibold uppercase tracking-wider text-[11px]">Priority</span>
                             {onPriorityChange ? (
                                 <div className="relative">
                                     <button
@@ -607,13 +667,15 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({
                                     )}
                                 </div>
                             ) : (
-                                <span className={`font-bold ${priority ? 'text-gray-900' : 'text-gray-600'}`}>
+                                <span className={`font-bold text-xs ${priority ? 'text-slate-900' : 'text-slate-600'}`}>
                                     {priority || '-'}
                                 </span>
                             )}
                         </div>
-                        <div className="flex justify-between items-center text-[14px]">
-                            <span className="text-gray-400 font-medium">Status</span>
+
+                        {/* Status Dropdown */}
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400 font-semibold uppercase tracking-wider text-[11px]">Status</span>
                             {onStatusChange ? (
                                 <div className="relative">
                                     <button
@@ -715,7 +777,7 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({
                                     )}
                                 </div>
                             ) : (
-                                <span className="font-bold text-gray-700">
+                                <span className="font-bold text-xs text-slate-700">
                                     {status || ticket.status || 'In Progress'}
                                 </span>
                             )}
@@ -723,287 +785,400 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({
                     </div>
                 </div>
 
-                {/* SLA Calculator Section */}
-                <div className="p-8 border-b border-gray-50">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h4 className="text-[14px] font-bold text-gray-900 tracking-tight">SLA calculator</h4>
-                            {isVendorTicket && (
-                                <p className="text-[11px] text-gray-400 font-medium mt-0.5">Disabled for Vendor tickets</p>
-                            )}
-                        </div>
+                {/* SLA Calculator Collapsible Section */}
+                <div className="p-4 border-b border-slate-100">
+                    <div className="flex items-center justify-between mb-3">
+                        <button
+                            type="button"
+                            onClick={() => setIsSlaCollapsed(!isSlaCollapsed)}
+                            className="flex items-center gap-2 text-left group/slatoggle cursor-pointer select-none"
+                        >
+                            <ChevronDown 
+                                size={16} 
+                                className={`text-slate-400 group-hover/slatoggle:text-slate-700 transition-transform duration-200 ${isSlaCollapsed ? '-rotate-90' : 'rotate-0'}`} 
+                            />
+                            <div>
+                                <h4 className="text-[13.5px] font-bold text-slate-900 tracking-tight group-hover/slatoggle:text-slate-700">
+                                    SLA Calculator
+                                </h4>
+                                {isVendorTicket && (
+                                    <p className="text-[10px] text-slate-400 font-medium">Disabled for Vendor tickets</p>
+                                )}
+                            </div>
+                        </button>
+
                         <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold text-gray-400 uppercase">
-                                {isVendorTicket ? 'SLA DISABLED' : (isSlaActive ? 'SLA ON' : 'SLA OFF')}
+                            <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">
+                                {isVendorTicket ? 'Disabled' : (isSlaActive ? 'SLA ON' : 'SLA OFF')}
                             </span>
                             <button
                                 onClick={handleSlaToggle}
                                 disabled={isVendorTicket}
                                 title={isVendorTicket ? 'SLA is disabled for Vendor (#V) tickets' : ''}
-                                className={`w-8 h-4 rounded-full transition-colors relative ${isVendorTicket ? 'bg-gray-200 cursor-not-allowed opacity-60' : (isSlaActive ? 'bg-orange-500' : 'bg-gray-200')}`}
+                                className={`w-8 h-4 rounded-full transition-colors relative cursor-pointer ${
+                                    isVendorTicket 
+                                        ? 'bg-slate-200 cursor-not-allowed opacity-60' 
+                                        : (isSlaActive ? 'bg-orange-500' : 'bg-slate-200')
+                                }`}
                             >
-                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${!isVendorTicket && isSlaActive ? 'translate-x-4' : 'translate-x-0'}`} />
+                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                                    !isVendorTicket && isSlaActive ? 'translate-x-4' : 'translate-x-0'
+                                }`} />
                             </button>
                         </div>
                     </div>
 
-                    <div className={`space-y-4 ${(!isSlaActive || isVendorTicket) ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <div className="flex justify-between items-center pb-1">
-                            <span className="text-[12px] font-bold text-gray-400 uppercase tracking-wider">Circuit ID</span>
-                            <span className={`text-[14px] font-bold ${circuit || ticket.circuitId ? 'text-gray-900' : 'text-gray-400'}`}>
-                                {activeTab?.startsWith('vendor')
-                                    ? (fullCircuitDetails?.supplierCircuitId || circuit || ticket.circuitId || 'None')
-                                    : (fullCircuitDetails?.customerCircuitId || circuit || ticket.circuitId || 'None')
-                                }
-                            </span>
-                        </div>
-
-                        {!activeTab?.startsWith('vendor') && (
-                            <div className="flex justify-between items-center pb-1">
-                                <span className="text-[12px] font-bold text-orange-400 uppercase tracking-wider">Supplier ID</span>
-                                <span className={`text-[14px] font-bold ${fullCircuitDetails?.supplierCircuitId ? 'text-gray-900' : 'text-gray-400'}`}>
-                                    {fullCircuitDetails?.supplierCircuitId || 'None'}
-                                </span>
-                            </div>
-                        )}
-                        <div className="flex justify-between items-center text-[14px]">
-                            <div className="flex items-center gap-2">
-                                <span className="text-gray-400 font-medium">SLA start time</span>
-                                <button
-                                    onClick={() => { setTempStartTime(dynamicSlaStart.time !== '-' ? dynamicSlaStart.time.replace(' hrs', '') : ''); setShowStartTimeModal(true); }}
-                                    className="p-1 hover:bg-orange-50 rounded-full text-orange-400 hover:text-orange-600 transition-all border border-transparent hover:border-orange-100 shadow-sm hover:shadow active:scale-90"
-                                >
-                                    <Plus size={12} strokeWidth={3} />
-                                </button>
-                            </div>
-                            <span className={`text-[14px] font-bold ${slaStartTime ? 'text-gray-900' : 'text-gray-600'}`}>
-                                {dynamicSlaStart.time !== '-' ? dynamicSlaStart.time : '-'}
-                            </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[14px]">
-                            <div className="flex items-center gap-2">
-                                <span className="text-gray-400 font-medium">SLA start date</span>
-                                <button
-                                    onClick={() => { setTempStartDate(dynamicSlaStart.date !== '-' ? dynamicSlaStart.date : ''); setShowStartDateModal(true); }}
-                                    className="p-1 hover:bg-orange-50 rounded-full text-orange-400 hover:text-orange-600 transition-all border border-transparent hover:border-orange-100 shadow-sm hover:shadow active:scale-90"
-                                >
-                                    <Plus size={12} strokeWidth={3} />
-                                </button>
-                            </div>
-                            <span className={`text-[14px] font-bold ${slaStartDate ? 'text-gray-900' : 'text-gray-600'}`}>
-                                {dynamicSlaStart.date !== '-' ? dynamicSlaStart.date : '-'}
-                            </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[14px]">
-                            <div className="flex items-center gap-2">
-                                <span className="text-gray-400 font-medium">SLA close at</span>
-                                <button
-                                    onClick={() => { setTempTime(dynamicSlaClose.time !== '-' ? dynamicSlaClose.time.replace(' hrs', '') : ''); setShowTimeModal(true); }}
-                                    className="p-1 hover:bg-orange-50 rounded-full text-orange-400 hover:text-orange-600 transition-all border border-transparent hover:border-orange-100 shadow-sm hover:shadow active:scale-90"
-                                >
-                                    <Plus size={12} strokeWidth={3} />
-                                </button>
-                            </div>
-                            <span className={`text-[14px] font-bold ${slaCloseTime ? 'text-gray-900' : 'text-gray-600'}`}>
-                                {dynamicSlaClose.time !== '-' ? dynamicSlaClose.time : '-'}
-                            </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[14px]">
-                            <div className="flex items-center gap-2">
-                                <span className="text-gray-400 font-medium">SLA close date</span>
-                                <button
-                                    onClick={() => { setTempDate(dynamicSlaClose.date !== '-' ? dynamicSlaClose.date : ''); setShowDateModal(true); }}
-                                    className="p-1 hover:bg-orange-50 rounded-full text-orange-400 hover:text-orange-600 transition-all border border-transparent hover:border-orange-100 shadow-sm hover:shadow active:scale-90"
-                                >
-                                    <Plus size={12} strokeWidth={3} />
-                                </button>
-                            </div>
-                            <span className={`text-[14px] font-bold ${slaCloseDate ? 'text-gray-900' : 'text-gray-600'}`}>
-                                {dynamicSlaClose.date !== '-' ? dynamicSlaClose.date : '-'}
-                            </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[14px]">
-                            <span className="text-gray-400 font-medium">Time Zone</span>
-                            <select
-                                value={slaTimeZone}
-                                onChange={(e) => handleSaveTimeZone(e.target.value)}
-                                className="bg-gray-50 border border-gray-100 rounded-md px-2 py-1 outline-none text-[12px] font-bold text-gray-700"
-                            >
-                                <option value="UTC">UTC</option>
-                                <option value="GMT">GMT</option>
-                                <option value="IST">IST</option>
-                            </select>
-                        </div>
-
-                        {/* Compensation Row */}
-                        <div className="mt-2 pt-4 border-t border-gray-50">
-                            <div className="flex justify-between items-center text-[14px] mb-1">
-                                <span className="text-gray-400 font-medium">SLA Status</span>
-                                <span className={`text-[13px] font-black px-2.5 py-0.5 rounded-full ${
-                                    slaStatus === 'Breached' || slaStatus === 'BREACHED'
-                                        ? 'bg-red-50 text-red-600 border border-red-100'
-                                        : slaStatus === 'No SLA'
-                                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                            : 'bg-green-50 text-green-600 border border-green-100'
-                                    }`}>
-                                    {slaStatus === 'No SLA' ? 'No SLA Set' : slaStatus}
-                                </span>
-                            </div>
-                            <div className="flex justify-between items-center text-[14px]">
-                                <span className="text-gray-400 font-medium">Compensation</span>
-                                <span className={`text-[14px] font-black ${slaCompensation !== '-' ? 'text-red-600' : 'text-green-600'
-                                    }`}>
-                                    {slaCompensation}
-                                </span>
-                            </div>
-                            {slaStatus === 'No SLA' && (
-                                <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl text-amber-800 text-[11px] flex items-start gap-2 mt-3 shadow-xs">
-                                    <AlertTriangle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="font-bold text-amber-900">⚠️ No SLA Rules Configured</p>
-                                        <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">This circuit has no active SLA rules. Go to <strong>Dashboard &gt; SLA</strong> to define rules so availability and compensation can calculate.</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Activity Log Section */}
-                <div className="p-8 space-y-8">
-                    <h4 className="text-[14px] font-bold text-gray-900 mb-6 tracking-tight">Activity log</h4>
-
-                    {status?.toLowerCase() === 'closed' && (
-                        <div className="flex gap-4 animate-in fade-in slide-in-from-left-2 duration-500">
-                            <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-500 flex-shrink-0">
-                                <CheckCircle size={18} />
-                            </div>
-                            <div className="flex-1">
-                                <div className="space-y-1">
-                                    <span className="text-[13px] font-bold text-gray-900 block">Ticket closed</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[11px] font-bold text-gray-400 uppercase">
-                                            {closedAt ? closedAt.split(' • ')[0] : 'Pending'}
-                                        </span>
-                                        {closedAt && <div className="w-1 h-1 rounded-full bg-gray-200" />}
-                                        <span className="text-[11px] font-bold text-gray-400 uppercase">
-                                            {closedAt ? closedAt.split(' • ')[1] : ''}
+                    {!isSlaCollapsed && (
+                        <div className={`space-y-3.5 pt-1 animate-in fade-in duration-200 ${(!isSlaActive || isVendorTicket) ? 'opacity-50 pointer-events-none' : ''}`}>
+                            {/* Circuit & Supplier Monospace Chips */}
+                            <div className="space-y-2">
+                                {/* Circuit ID */}
+                                <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 flex items-center justify-between group/circ hover:bg-slate-50 transition-colors">
+                                    <div className="flex flex-col min-w-0 pr-2">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Circuit ID</span>
+                                        <span className="font-mono text-[12.5px] font-bold text-slate-800 truncate select-all">
+                                            {activeTab?.startsWith('vendor')
+                                                ? (fullCircuitDetails?.supplierCircuitId || circuit || ticket.circuitId || 'None')
+                                                : (fullCircuitDetails?.customerCircuitId || circuit || ticket.circuitId || 'None')
+                                            }
                                         </span>
                                     </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCopy(
+                                            activeTab?.startsWith('vendor')
+                                                ? (fullCircuitDetails?.supplierCircuitId || circuit || ticket.circuitId || '')
+                                                : (fullCircuitDetails?.customerCircuitId || circuit || ticket.circuitId || ''),
+                                            'Circuit ID'
+                                        )}
+                                        className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-all flex-shrink-0 cursor-pointer"
+                                        title="Copy Circuit ID"
+                                    >
+                                        {copiedField === 'Circuit ID' ? (
+                                            <Check size={14} className="text-emerald-600" />
+                                        ) : (
+                                            <Copy size={14} />
+                                        )}
+                                    </button>
                                 </div>
-                                <p className="text-[11px] text-green-500 font-bold mt-2">Ticket resolution confirmed</p>
+
+                                {/* Supplier ID */}
+                                {!activeTab?.startsWith('vendor') && (
+                                    <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 flex items-center justify-between group/supp hover:bg-slate-50 transition-colors">
+                                        <div className="flex flex-col min-w-0 pr-2">
+                                            <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">Supplier ID</span>
+                                            <span className="font-mono text-[12.5px] font-bold text-slate-800 truncate select-all">
+                                                {fullCircuitDetails?.supplierCircuitId || 'None'}
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCopy(fullCircuitDetails?.supplierCircuitId || '', 'Supplier ID')}
+                                            className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-all flex-shrink-0 cursor-pointer"
+                                            title="Copy Supplier ID"
+                                        >
+                                            {copiedField === 'Supplier ID' ? (
+                                                <Check size={14} className="text-emerald-600" />
+                                            ) : (
+                                                <Copy size={14} />
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* SLA Timestamps Box */}
+                            <div className="bg-slate-50/50 border border-slate-200/60 rounded-xl p-3 space-y-2.5 text-xs">
+                                {/* Start Time */}
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-slate-500 font-medium">SLA start time</span>
+                                        <button
+                                            onClick={() => { setTempStartTime(dynamicSlaStart.time !== '-' ? dynamicSlaStart.time.replace(' hrs', '') : ''); setShowStartTimeModal(true); }}
+                                            className="p-1 hover:bg-orange-50 rounded-md text-orange-500 hover:text-orange-600 transition-all border border-slate-200/80 hover:border-orange-200 bg-white shadow-2xs"
+                                            title="Edit start time"
+                                        >
+                                            <Plus size={11} strokeWidth={2.6} />
+                                        </button>
+                                    </div>
+                                    <span className={`font-mono text-[12px] font-bold ${slaStartTime ? 'text-slate-900' : 'text-slate-500'}`}>
+                                        {dynamicSlaStart.time !== '-' ? dynamicSlaStart.time : '-'}
+                                    </span>
+                                </div>
+
+                                {/* Start Date */}
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-slate-500 font-medium">SLA start date</span>
+                                        <button
+                                            onClick={() => { setTempStartDate(dynamicSlaStart.date !== '-' ? dynamicSlaStart.date : ''); setShowStartDateModal(true); }}
+                                            className="p-1 hover:bg-orange-50 rounded-md text-orange-500 hover:text-orange-600 transition-all border border-slate-200/80 hover:border-orange-200 bg-white shadow-2xs"
+                                            title="Edit start date"
+                                        >
+                                            <Plus size={11} strokeWidth={2.6} />
+                                        </button>
+                                    </div>
+                                    <span className={`text-[12px] font-bold ${slaStartDate ? 'text-slate-900' : 'text-slate-500'}`}>
+                                        {dynamicSlaStart.date !== '-' ? dynamicSlaStart.date : '-'}
+                                    </span>
+                                </div>
+
+                                {/* Close Time */}
+                                <div className="flex justify-between items-center pt-2 border-t border-slate-200/50">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-slate-500 font-medium">SLA close at</span>
+                                        <button
+                                            onClick={() => { setTempTime(dynamicSlaClose.time !== '-' ? dynamicSlaClose.time.replace(' hrs', '') : ''); setShowTimeModal(true); }}
+                                            className="p-1 hover:bg-orange-50 rounded-md text-orange-500 hover:text-orange-600 transition-all border border-slate-200/80 hover:border-orange-200 bg-white shadow-2xs"
+                                            title="Edit close time"
+                                        >
+                                            <Plus size={11} strokeWidth={2.6} />
+                                        </button>
+                                    </div>
+                                    <span className={`font-mono text-[12px] font-bold ${slaCloseTime ? 'text-slate-900' : 'text-slate-500'}`}>
+                                        {dynamicSlaClose.time !== '-' ? dynamicSlaClose.time : '-'}
+                                    </span>
+                                </div>
+
+                                {/* Close Date */}
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-slate-500 font-medium">SLA close date</span>
+                                        <button
+                                            onClick={() => { setTempDate(dynamicSlaClose.date !== '-' ? dynamicSlaClose.date : ''); setShowDateModal(true); }}
+                                            className="p-1 hover:bg-orange-50 rounded-md text-orange-500 hover:text-orange-600 transition-all border border-slate-200/80 hover:border-orange-200 bg-white shadow-2xs"
+                                            title="Edit close date"
+                                        >
+                                            <Plus size={11} strokeWidth={2.6} />
+                                        </button>
+                                    </div>
+                                    <span className={`text-[12px] font-bold ${slaCloseDate ? 'text-slate-900' : 'text-slate-500'}`}>
+                                        {dynamicSlaClose.date !== '-' ? dynamicSlaClose.date : '-'}
+                                    </span>
+                                </div>
+
+                                {/* Timezone */}
+                                <div className="flex justify-between items-center pt-2 border-t border-slate-200/50">
+                                    <span className="text-slate-500 font-medium">Time Zone</span>
+                                    <select
+                                        value={slaTimeZone}
+                                        onChange={(e) => handleSaveTimeZone(e.target.value)}
+                                        className="bg-white border border-slate-200 rounded-lg px-2 py-1 outline-none text-[11.5px] font-bold text-slate-700 shadow-2xs cursor-pointer hover:border-slate-300"
+                                    >
+                                        <option value="UTC">UTC</option>
+                                        <option value="GMT">GMT</option>
+                                        <option value="IST">IST</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* SLA Status & Compensation */}
+                            <div className="bg-slate-50/50 border border-slate-200/60 rounded-xl p-3 space-y-2 text-xs">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500 font-medium">SLA Status</span>
+                                    <span className={`text-[12px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                                        slaStatus === 'Breached' || slaStatus === 'BREACHED'
+                                            ? 'bg-red-50 text-red-600 border border-red-200'
+                                            : slaStatus === 'No SLA'
+                                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                    }`}>
+                                        {slaStatus === 'No SLA' ? 'No SLA Set' : slaStatus}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500 font-medium">Compensation</span>
+                                    <span className={`text-[13px] font-black ${
+                                        slaCompensation !== '-' ? 'text-red-600' : 'text-emerald-600'
+                                    }`}>
+                                        {slaCompensation}
+                                    </span>
+                                </div>
+                                {slaStatus === 'No SLA' && (
+                                    <div className="p-2.5 bg-amber-50/90 border border-amber-200/90 rounded-xl text-amber-800 text-[11px] flex items-start gap-2 mt-2 shadow-2xs">
+                                        <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-bold text-amber-900">⚠️ No SLA Rules Configured</p>
+                                            <p className="text-[10.5px] text-amber-700 mt-0.5 leading-relaxed">
+                                                This circuit has no active SLA rules. Go to <strong>Dashboard &gt; SLA</strong> to define rules.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
+                </div>
 
-                    {/* Activity Logs from Backend */}
-                    {activityLogs.length > 0 ? (
-                        activityLogs.slice().reverse().map((log) => (
-                            <div key={log.id} className="flex gap-4">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${log.action === 'created' ? 'bg-[#F5F2F9] text-[#A688C4]' :
-                                    log.action === 'auto_replied' ? 'bg-orange-50 text-orange-500' :
-                                        log.action === 'replied' ? 'bg-blue-50 text-blue-500' :
-                                            'bg-gray-50 text-gray-500'
-                                    }`}>
-                                    <TicketIcon size={18} />
+                {/* Activity Log Collapsible Section */}
+                <div className="p-4 border-b border-slate-100">
+                    <button
+                        type="button"
+                        onClick={() => setIsActivityCollapsed(!isActivityCollapsed)}
+                        className="flex items-center justify-between w-full group/act cursor-pointer select-none mb-2"
+                    >
+                        <div className="flex items-center gap-2">
+                            <ChevronDown 
+                                size={16} 
+                                className={`text-slate-400 group-hover/act:text-slate-700 transition-transform duration-200 ${isActivityCollapsed ? '-rotate-90' : 'rotate-0'}`} 
+                            />
+                            <h4 className="text-[13.5px] font-bold text-slate-900 tracking-tight group-hover/act:text-slate-700">
+                                Activity Log
+                            </h4>
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                            {activityLogs.length + (status?.toLowerCase() === 'closed' ? 1 : 0)}
+                        </span>
+                    </button>
+
+                    {!isActivityCollapsed && (
+                        <div className="space-y-4 pt-2 animate-in fade-in duration-200">
+                            {status?.toLowerCase() === 'closed' && (
+                                <div className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 flex-shrink-0 mt-0.5">
+                                        <CheckCircle size={15} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="space-y-0.5">
+                                            <span className="text-[12.5px] font-bold text-slate-900 block">Ticket closed</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10.5px] font-bold text-slate-400 uppercase">
+                                                    {closedAt ? closedAt.split(' • ')[0] : 'Pending'}
+                                                </span>
+                                                {closedAt && <div className="w-1 h-1 rounded-full bg-slate-300" />}
+                                                <span className="text-[10.5px] font-bold text-slate-400 uppercase">
+                                                    {closedAt ? closedAt.split(' • ')[1] : ''}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <p className="text-[11px] text-emerald-600 font-semibold mt-1">Ticket resolution confirmed</p>
+                                    </div>
                                 </div>
-                                <div className="flex-1">
-                                    <div className="space-y-1">
-                                        <span className="text-[13px] font-bold text-gray-900 block">{log.description}</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tight">
-                                                {log.createdAt ? formatDateWithTZ(log.createdAt, slaTimeZone) : log.date}
-                                            </span>
-                                            <div className="w-1 h-1 rounded-full bg-gray-200" />
-                                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tight">{log.createdAt ? formatTimeWithTZ(log.createdAt, slaTimeZone) : log.time} hrs</span>
+                            )}
+
+                            {/* Activity Logs from Backend */}
+                            {activityLogs.length > 0 ? (
+                                activityLogs.slice().reverse().map((log) => (
+                                    <div key={log.id} className="flex gap-3">
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                                            log.action === 'created' ? 'bg-purple-50 text-purple-600 border border-purple-200' :
+                                            log.action === 'auto_replied' ? 'bg-orange-50 text-orange-600 border border-orange-200' :
+                                            log.action === 'replied' ? 'bg-blue-50 text-blue-600 border border-blue-200' :
+                                            'bg-slate-50 text-slate-600 border border-slate-200'
+                                        }`}>
+                                            <TicketIcon size={14} />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="space-y-0.5">
+                                                <span className="text-[12.5px] font-bold text-slate-800 block leading-snug">{log.description}</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-tight">
+                                                        {log.createdAt ? formatDateWithTZ(log.createdAt, slaTimeZone) : log.date}
+                                                    </span>
+                                                    <div className="w-1 h-1 rounded-full bg-slate-300" />
+                                                    <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-tight">
+                                                        {log.createdAt ? formatTimeWithTZ(log.createdAt, slaTimeZone) : log.time} hrs
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <p className="text-[11px] text-slate-500 font-medium mt-1">By <span className="font-semibold text-slate-700">{log.author}</span></p>
                                         </div>
                                     </div>
-                                    <p className="text-[11px] text-gray-500 font-bold mt-2">By {log.author}</p>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="flex gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-[#F5F2F9] flex items-center justify-center text-[#A688C4] flex-shrink-0">
-                                <TicketIcon size={18} />
-                            </div>
-                            <div className="flex-1">
-                                <div className="space-y-1">
-                                    <span className="text-[13px] font-bold text-gray-900 block">Ticket opened</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tight">
-                                            {formatDateWithTZ(ticket.createdAt || ticket.date || '', slaTimeZone)}
-                                        </span>
-                                        <div className="w-1 h-1 rounded-full bg-gray-200" />
-                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tight">{formatTimeWithTZ(ticket.receivedAt || ticket.createdAt || new Date(), slaTimeZone)} hrs</span>
+                                ))
+                            ) : (
+                                <div className="flex gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 flex-shrink-0 mt-0.5">
+                                        <TicketIcon size={14} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="space-y-0.5">
+                                            <span className="text-[12.5px] font-bold text-slate-900 block">Ticket opened</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-tight">
+                                                    {formatDateWithTZ(ticket.createdAt || ticket.date || '', slaTimeZone)}
+                                                </span>
+                                                <div className="w-1 h-1 rounded-full bg-slate-300" />
+                                                <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-tight">
+                                                    {formatTimeWithTZ(ticket.receivedAt || ticket.createdAt || new Date(), slaTimeZone)} hrs
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <p className="text-[11px] text-purple-600 font-medium mt-1">Ticket #{ticket.ticketId} created</p>
                                     </div>
                                 </div>
-                                <p className="text-[11px] text-[#A688C4] font-bold mt-2">Ticket #{ticket.ticketId} created</p>
-                            </div>
+                            )}
                         </div>
                     )}
                 </div>
             </div>
 
             {/* Create Notes Footer */}
-            <div className="px-6 pb-6 relative">
+            <div className="p-4 relative">
                 {/* Notes Container */}
                 {isNotesOpen && (
-                    <div className="absolute bottom-full left-6 right-6 mb-3 bg-white border border-gray-100 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col z-50 animate-in slide-in-from-bottom-2 duration-300">
+                    <div className="absolute bottom-full left-4 right-4 mb-2.5 bg-white border border-slate-200 rounded-2xl shadow-[0_12px_40px_rgba(15,23,42,0.15)] overflow-hidden flex flex-col z-50 animate-in slide-in-from-bottom-2 duration-200">
                         {/* Header */}
-                        <div className="px-5 py-3 border-b border-gray-50 flex items-center justify-between bg-white">
-                            <h5 className="text-[13px] font-bold text-gray-900">Notes</h5>
+                        <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                            <div className="flex items-center gap-2">
+                                <h5 className="text-[13px] font-bold text-slate-900">Internal Notes</h5>
+                                {notes.length > 0 && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded-full">
+                                        {notes.length}
+                                    </span>
+                                )}
+                            </div>
                             <button
                                 onClick={() => setIsNotesOpen(false)}
-                                className="p-1 hover:bg-gray-50 rounded-lg transition-colors text-gray-400"
+                                className="p-1 hover:bg-slate-200/60 rounded-lg transition-colors text-slate-400 hover:text-slate-700 cursor-pointer"
+                                aria-label="Close notes"
                             >
                                 <X size={14} />
                             </button>
                         </div>
 
-                        {/* List - "Different Box" 1 */}
-                        <div className="max-h-[220px] overflow-y-auto p-4 space-y-3 bg-[#FCFCFD]">
+                        {/* List */}
+                        <div className="max-h-[220px] overflow-y-auto p-3.5 space-y-2.5 bg-slate-50/30">
                             {notes.length > 0 ? (
                                 notes.map((note, i) => (
                                     <div key={i} className="group relative">
-                                        <div className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-red-100 transition-colors">
-                                            <p className="text-[12px] text-gray-600 font-medium leading-relaxed break-words whitespace-pre-wrap pr-4">{note.text}</p>
-                                            <div className="mt-2 flex justify-between items-center">
+                                        <div className="p-2.5 bg-white border border-slate-200/80 rounded-xl shadow-2xs hover:border-slate-300 transition-colors">
+                                            <p className="text-[12px] text-slate-700 font-medium leading-relaxed break-words whitespace-pre-wrap pr-4">{note.text}</p>
+                                            <div className="mt-1.5 flex justify-between items-center">
                                                 {canDelete() && (
                                                     <button
                                                         onClick={() => handleDeleteNote(i)}
-                                                        className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                        className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
                                                         title="Delete note"
                                                     >
                                                         <Trash2 size={12} />
                                                     </button>
                                                 )}
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-bold text-orange-500/70">{note.author || 'Agent'}</span>
-                                                    <span className="text-[10px] font-bold text-gray-400">{note.time}</span>
+                                                <div className="flex items-center gap-2 ml-auto">
+                                                    <span className="text-[10px] font-bold text-slate-600">{note.author || 'Agent'}</span>
+                                                    <span className="text-[10px] font-medium text-slate-400">{note.time}</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 ))
                             ) : (
-                                <div className="py-8 flex flex-col items-center justify-center text-center opacity-40">
-                                    <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center mb-2">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                <div className="py-6 flex flex-col items-center justify-center text-center opacity-50">
+                                    <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center mb-1.5">
+                                        <TicketIcon size={14} className="text-slate-400" />
                                     </div>
-                                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">No notes yet</p>
+                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">No notes yet</p>
                                 </div>
                             )}
                         </div>
 
-                        {/* Input Area - "Different Box" 2 */}
-                        <div className="p-4 bg-white border-t border-gray-50">
+                        {/* Input Area */}
+                        <div className="p-3 bg-white border-t border-slate-100">
                             <div className="relative group">
                                 <textarea
                                     value={newNote}
                                     onChange={(e) => setNewNote(e.target.value)}
-                                    placeholder="Add a private note..."
-                                    className="w-full min-h-[80px] p-3 bg-gray-50/50 border border-gray-100 rounded-xl text-[12px] font-medium text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-orange-200 focus:bg-white transition-all resize-none scrollbar-hide break-words"
+                                    placeholder="Add a private note (Press Enter to send)..."
+                                    className="w-full min-h-[70px] p-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-[12px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition-all resize-none scrollbar-hide break-words"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !e.shiftKey) {
                                             e.preventDefault();
@@ -1011,14 +1186,18 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({
                                         }
                                     }}
                                 />
-                                <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                                <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
                                     <button
                                         onClick={handleAddNote}
                                         disabled={!newNote.trim()}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all shadow-sm ${newNote.trim() ? 'bg-orange-500 text-white hover:bg-orange-600 scale-100' : 'bg-gray-100 text-gray-300 scale-95 cursor-not-allowed'}`}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shadow-xs cursor-pointer ${
+                                            newNote.trim() 
+                                                ? 'bg-slate-900 text-white hover:bg-slate-800 scale-100' 
+                                                : 'bg-slate-100 text-slate-300 scale-95 cursor-not-allowed'
+                                        }`}
                                     >
                                         <span className="text-[11px] font-bold">Add note</span>
-                                        <Send size={12} />
+                                        <Send size={11} />
                                     </button>
                                 </div>
                             </div>
@@ -1026,24 +1205,26 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({
                     </div>
                 )}
 
+                {/* Notes Trigger Button */}
                 <button
                     onClick={() => setIsNotesOpen(!isNotesOpen)}
-                    className={`w-full flex items-center justify-between px-5 py-4 bg-[#FFF9F1] text-[#B87C3D] rounded-xl font-bold text-[14px] hover:bg-[#FFF4E4] transition-all border border-transparent active:scale-[0.98] outline-none group ${isNotesOpen ? 'border-orange-200 shadow-sm' : ''}`}
+                    className={`w-full flex items-center justify-between px-4 py-3 bg-slate-900 text-white rounded-xl font-bold text-[13px] hover:bg-slate-800 shadow-xs hover:shadow transition-all active:scale-[0.98] outline-none group cursor-pointer ${
+                        isNotesOpen ? 'ring-2 ring-slate-900/20' : ''
+                    }`}
                 >
-                    <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 flex items-center justify-center opacity-80 relative">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                        </div>
-                        <span className="relative">
-                            Create notes
-                            {notes.length > 0 && (
-                                <span className="absolute -right-7 top-1/2 -translate-y-1/2 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-orange-500 text-white text-[10px] font-bold rounded-full shadow-sm ring-2 ring-[#FFF9F1] animate-in zoom-in duration-300">
-                                    {notes.length}
-                                </span>
-                            )}
-                        </span>
+                    <div className="flex items-center gap-2.5">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        <span>Internal Notes</span>
+                        {notes.length > 0 && (
+                            <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1.5 bg-brand-red text-white text-[10px] font-bold rounded-full shadow-2xs">
+                                {notes.length}
+                            </span>
+                        )}
                     </div>
-                    <ChevronUp size={16} className={`opacity-60 transition-transform duration-300 ${isNotesOpen ? 'rotate-180' : ''}`} />
+                    <ChevronUp size={15} className={`text-slate-400 transition-transform duration-300 ${isNotesOpen ? 'rotate-180' : ''}`} />
                 </button>
             </div>
 
