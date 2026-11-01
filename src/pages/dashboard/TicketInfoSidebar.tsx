@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, Ticket as TicketIcon, X, Send, Trash2, CheckCircle, Plus, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { ChevronUp, ChevronDown, Ticket as TicketIcon, X, Send, Trash2, CheckCircle, Plus, Calendar, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { nowDateIST, nowTimeIST, formatDateWithTZ, formatTimeWithTZ } from '../../utils/dateUtils';
 import { getAuthHeaders, API_URL_SLA } from '../../types/sla';
@@ -47,6 +47,9 @@ interface TicketInfoSidebarProps {
     vendorName?: string;
     onTimeZoneChangeActive?: (zone: string) => void;
     onPriorityChange?: (newPriority: string) => void;
+    isUpdatingPriority?: boolean;
+    onStatusChange?: (newStatus: string) => void;
+    isUpdatingStatus?: boolean;
 }
 
 interface ActivityLog {
@@ -59,11 +62,26 @@ interface ActivityLog {
     createdAt?: string; // ISO timestamp — use this for IST formatting when available
 }
 
-export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, priority, circuit, status, closedAt, activeTab, vendorEmail, vendorName, onTimeZoneChangeActive, onPriorityChange }) => {
+export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({
+    ticket,
+    priority,
+    circuit,
+    status,
+    closedAt,
+    activeTab,
+    vendorEmail,
+    vendorName,
+    onTimeZoneChangeActive,
+    onPriorityChange,
+    isUpdatingPriority = false,
+    onStatusChange,
+    isUpdatingStatus = false
+}) => {
     const { id } = useParams();
     const { canDelete } = useAuth();
     const [isNotesOpen, setIsNotesOpen] = useState(false);
     const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
+    const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
     const [notes, setNotes] = useState<Note[]>([]);
     const [newNote, setNewNote] = useState('');
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -522,14 +540,15 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                                 <div className="relative">
                                     <button
                                         type="button"
-                                        onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
+                                        onClick={() => !isUpdatingPriority && setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
+                                        disabled={isUpdatingPriority}
                                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                                             priority === 'High'
                                                 ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                                                 : priority === 'Low'
                                                 ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
                                                 : 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
-                                        }`}
+                                        } ${isUpdatingPriority ? 'opacity-70 cursor-wait' : ''}`}
                                         title="Click to change ticket priority"
                                     >
                                         <div className="flex items-end gap-[2px] h-3 w-3">
@@ -593,30 +612,114 @@ export const TicketInfoSidebar: React.FC<TicketInfoSidebarProps> = ({ ticket, pr
                                 </span>
                             )}
                         </div>
-                        {/* <div className="flex justify-between items-center text-[14px]">
-                            <span className="text-gray-400 font-medium">Maintenance Mode</span>
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        const newStatus = !ticket.isMaintenance;
-                                        await fetch(`${API_BASE_URL}/api/tickets/${ticket.id}`, {
-                                            method: 'PUT',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'Authorization': `Bearer ${JSON.parse(localStorage.getItem('edgestone_user') || '{}').token}`
-                                            },
-                                            body: JSON.stringify({ isMaintenance: newStatus })
-                                        });
-                                        toast.success(`Ticket marked as ${newStatus ? 'Maintenance' : 'Normal'}. Please refresh to reflect changes.`);
-                                    } catch(e) {
-                                        toast.error('Failed to update maintenance status');
-                                    }
-                                }}
-                                className={`w-8 h-4 rounded-full transition-colors relative ${ticket.isMaintenance ? 'bg-orange-500' : 'bg-gray-200'}`}
-                            >
-                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${ticket.isMaintenance ? 'translate-x-4' : 'translate-x-0'}`} />
-                            </button>
-                        </div> */}
+                        <div className="flex justify-between items-center text-[14px]">
+                            <span className="text-gray-400 font-medium">Status</span>
+                            {onStatusChange ? (
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => !isUpdatingStatus && setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                                        disabled={isUpdatingStatus}
+                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                                            (status || ticket.status || 'In Progress').toLowerCase() === 'closed'
+                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                                                : (status || ticket.status || 'In Progress').toLowerCase() === 'maintenance'
+                                                    ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+                                                    : (status || ticket.status || 'In Progress').toLowerCase() === 'spam' || (status || ticket.status || 'In Progress').toLowerCase() === 'others'
+                                                        ? 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                                                        : 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100'
+                                        } ${isUpdatingStatus ? 'opacity-70 cursor-wait' : ''}`}
+                                        title="Click to change ticket status / maintenance mode"
+                                    >
+                                        {isUpdatingStatus ? (
+                                            <>
+                                                <Loader2 size={12} className="animate-spin text-gray-500" />
+                                                <span>Updating...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>{status || ticket.status || 'In Progress'}</span>
+                                                <ChevronDown size={12} className={`text-gray-400 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+                                            </>
+                                        )}
+                                    </button>
+
+                                    {isStatusDropdownOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setIsStatusDropdownOpen(false)} />
+                                            <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden p-1.5 animate-in fade-in slide-in-from-top-1">
+                                                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2.5 py-1 border-b border-gray-50 mb-1">
+                                                    Change Status
+                                                </div>
+                                                {(status || ticket.status || 'In Progress').toLowerCase() !== 'closed' && (status || ticket.status || 'In Progress').toLowerCase() !== 'spam' && (status || ticket.status || 'In Progress').toLowerCase() !== 'others' && (status || ticket.status || 'In Progress').toLowerCase() !== 'maintenance' ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            onStatusChange('Closed');
+                                                            setIsStatusDropdownOpen(false);
+                                                        }}
+                                                        className="w-full px-2.5 py-2 text-left text-xs font-bold text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                                                    >
+                                                        <span>Close Ticket</span>
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            onStatusChange('In Progress');
+                                                            setIsStatusDropdownOpen(false);
+                                                        }}
+                                                        className="w-full px-2.5 py-2 text-left text-xs font-bold text-orange-600 hover:bg-orange-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                                                    >
+                                                        <span>Re-Open Ticket as Support</span>
+                                                    </button>
+                                                )}
+                                                {(status || ticket.status || 'In Progress').toLowerCase() !== 'maintenance' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            onStatusChange('Maintenance');
+                                                            setIsStatusDropdownOpen(false);
+                                                        }}
+                                                        className="w-full px-2.5 py-2 text-left text-xs font-bold text-purple-700 hover:bg-purple-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                                                    >
+                                                        <span>Mark as Maintenance</span>
+                                                    </button>
+                                                )}
+                                                {(status || ticket.status || 'In Progress').toLowerCase() !== 'spam' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            onStatusChange('Spam');
+                                                            setIsStatusDropdownOpen(false);
+                                                        }}
+                                                        className="w-full px-2.5 py-2 text-left text-xs font-bold text-gray-600 hover:bg-gray-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                                                    >
+                                                        <span>Mark as Spam</span>
+                                                    </button>
+                                                )}
+                                                {(status || ticket.status || 'In Progress').toLowerCase() !== 'others' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            onStatusChange('Others');
+                                                            setIsStatusDropdownOpen(false);
+                                                        }}
+                                                        className="w-full px-2.5 py-2 text-left text-xs font-bold text-gray-600 hover:bg-gray-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                                                    >
+                                                        <span>Mark as Others</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            ) : (
+                                <span className="font-bold text-gray-700">
+                                    {status || ticket.status || 'In Progress'}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
