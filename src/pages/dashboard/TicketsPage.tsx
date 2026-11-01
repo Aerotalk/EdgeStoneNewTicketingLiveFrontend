@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+
 import { useSearchParams } from 'react-router-dom';
 import { TicketReplyView } from './TicketReplyView';
 import { Topbar } from '../../components/ui/Topbar';
@@ -97,7 +98,7 @@ const TicketsPage: React.FC = () => {
                     ? (t.vendor?.name || t.email.split('@')[0])
                     : (t.client?.name || t.email.split('@')[0]),
                 status: t.status.toLowerCase(),
-                isMaintenance: (t as any).isMaintenance
+                isMaintenance: (t as { isMaintenance?: boolean }).isMaintenance
             }));
 
             setTickets(formattedTickets);
@@ -107,7 +108,7 @@ const TicketsPage: React.FC = () => {
                 return updated ? { ...prev, ...updated, replies: updated.replies || prev.replies } : prev;
             });
             setError(null);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Failed to fetch tickets:', err);
             setError('Failed to load tickets. Please try again.');
         } finally {
@@ -139,7 +140,7 @@ const TicketsPage: React.FC = () => {
 
     // Calculate exact counts for each tab so user immediately sees where tickets are located
     const tabCounts = useMemo(() => {
-        let all = tickets.length;
+        const all = tickets.length;
         let open = 0;
         let inProgress = 0;
         let closed = 0;
@@ -202,9 +203,10 @@ const TicketsPage: React.FC = () => {
             setTicketToDelete(null);
             await fetchTickets();
             refreshDashboard();
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Failed to delete ticket:', err);
-            toast.error(err.response?.data?.message || 'Failed to delete ticket');
+            const error = err as { response?: { data?: { message?: string } } };
+            toast.error(error.response?.data?.message || 'Failed to delete ticket');
         } finally {
             setIsDeletingTicket(false);
         }
@@ -213,7 +215,7 @@ const TicketsPage: React.FC = () => {
     // Calculate metadata for each ticket relative to today's date in IST
     const todayStr = useMemo(() => toISTDateString(new Date()), []);
 
-    const getTicketMeta = (t: UITicket) => {
+    const getTicketMeta = useCallback((t: UITicket) => {
         const createdDateStr = toISTDateString(t.createdAt || t.date);
         const isCreatedToday = createdDateStr === todayStr;
 
@@ -246,7 +248,7 @@ const TicketsPage: React.FC = () => {
             isResolvedToday,
             isMaint
         };
-    };
+    }, [todayStr]);
 
     // Day-Wise Intelligence Metrics
     const dayWiseMetrics = useMemo(() => {
@@ -278,7 +280,7 @@ const TicketsPage: React.FC = () => {
             carriedForward,
             resolvedToday
         };
-    }, [tickets, todayStr]);
+    }, [tickets, getTicketMeta]);
 
     const filteredTickets = useMemo(() => {
         return tickets.filter(t => {
@@ -357,7 +359,7 @@ const TicketsPage: React.FC = () => {
 
             return true;
         });
-    }, [tickets, activeTab, searchQuery, appliedFilter, appliedCustomRange, activityFilter, todayStr]);
+    }, [tickets, activeTab, searchQuery, appliedFilter, appliedCustomRange, activityFilter, getTicketMeta, todayStr]);
 
     // Grouping by Day for Timeline View (Groups tickets by creation date descending)
     const groupedTickets = useMemo(() => {
@@ -390,7 +392,7 @@ const TicketsPage: React.FC = () => {
 
         // Sort groups descending by date
         return Object.values(groups).sort((a, b) => b.dateStr.localeCompare(a.dateStr));
-    }, [filteredTickets, isGroupedByDay, todayStr]);
+    }, [filteredTickets, isGroupedByDay, todayStr, getTicketMeta]);
 
     if (selectedTicket) {
         return (
@@ -434,25 +436,25 @@ const TicketsPage: React.FC = () => {
 
             {/* Smart Day-Wise Intelligence & Activity Tracking Bar */}
             <div className="px-4 sm:px-8 pt-4 pb-2">
-                <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                         <div className="flex items-center gap-2">
-                            <span className="text-[13px] font-bold text-gray-800 flex items-center gap-1.5 uppercase tracking-wider">
-                                <Zap size={14} className="text-orange-500 fill-orange-500" />
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                            <span className="text-[12px] font-bold text-slate-800 uppercase tracking-wider font-mono">
                                 Day-Wise Ticket Intelligence
                             </span>
-                            <span className="text-[12px] font-medium text-gray-400">
-                                (IST: {formatDateIST(new Date(), { day: 'numeric', month: 'short', year: 'numeric' })})
+                            <span className="text-[11px] font-medium text-slate-400 font-mono">
+                                (IST {formatDateIST(new Date(), { day: 'numeric', month: 'short', year: 'numeric' })})
                             </span>
                         </div>
 
                         {/* View Mode Toggle: Grid vs Day-Wise Timeline */}
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                            <div className="flex items-center bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/80">
                                 <button
                                     onClick={() => setIsGroupedByDay(false)}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-semibold rounded-md transition-all ${
-                                        !isGroupedByDay ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-700'
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 text-[11.5px] font-semibold rounded-md transition-all ${
+                                        !isGroupedByDay ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
                                     }`}
                                 >
                                     <LayoutGrid size={13} />
@@ -460,8 +462,8 @@ const TicketsPage: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={() => setIsGroupedByDay(true)}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-semibold rounded-md transition-all ${
-                                        isGroupedByDay ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-700'
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 text-[11.5px] font-semibold rounded-md transition-all ${
+                                        isGroupedByDay ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
                                     }`}
                                 >
                                     <CalendarDays size={13} />
@@ -472,7 +474,7 @@ const TicketsPage: React.FC = () => {
                             {activityFilter !== 'all' && (
                                 <button
                                     onClick={() => setActivityFilter('all')}
-                                    className="flex items-center gap-1 text-[11px] font-bold text-gray-500 hover:text-gray-800 bg-gray-100 px-2 py-1 rounded-md transition-all"
+                                    className="flex items-center gap-1 text-[11px] font-bold text-slate-600 hover:text-slate-900 bg-slate-100 border border-slate-200/80 px-2 py-1 rounded-md transition-all"
                                 >
                                     <X size={12} />
                                     Clear Filter
@@ -488,15 +490,15 @@ const TicketsPage: React.FC = () => {
                             onClick={() => setActivityFilter(prev => prev === 'new-support' ? 'all' : 'new-support')}
                             className={`flex flex-col text-left p-2.5 rounded-xl border transition-all ${
                                 activityFilter === 'new-support' 
-                                    ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-100' 
-                                    : 'bg-white border-gray-200 hover:border-blue-200 hover:bg-blue-50/30'
+                                    ? 'bg-blue-50/90 border-blue-400 ring-2 ring-blue-100 shadow-2xs' 
+                                    : 'bg-white border-slate-200/90 hover:border-blue-300 hover:bg-blue-50/20'
                             }`}
                         >
-                            <span className="text-[11px] font-bold text-blue-700 flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-blue-700 flex items-center justify-between">
                                 <span>Support Today</span>
                                 <LifeBuoy size={12} className="text-blue-500" />
                             </span>
-                            <span className="text-lg font-bold text-gray-900 mt-0.5">{dayWiseMetrics.newSupport}</span>
+                            <span className="text-lg font-bold text-slate-900 font-mono mt-0.5">{dayWiseMetrics.newSupport}</span>
                         </button>
 
                         {/* New Maintenance Today */}
@@ -504,15 +506,15 @@ const TicketsPage: React.FC = () => {
                             onClick={() => setActivityFilter(prev => prev === 'new-maint' ? 'all' : 'new-maint')}
                             className={`flex flex-col text-left p-2.5 rounded-xl border transition-all ${
                                 activityFilter === 'new-maint' 
-                                    ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-100' 
-                                    : 'bg-white border-gray-200 hover:border-amber-200 hover:bg-amber-50/30'
+                                    ? 'bg-amber-50/90 border-amber-400 ring-2 ring-amber-100 shadow-2xs' 
+                                    : 'bg-white border-slate-200/90 hover:border-amber-300 hover:bg-amber-50/20'
                             }`}
                         >
-                            <span className="text-[11px] font-bold text-amber-800 flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-amber-800 flex items-center justify-between">
                                 <span>Maint. Today</span>
                                 <Wrench size={12} className="text-amber-600" />
                             </span>
-                            <span className="text-lg font-bold text-gray-900 mt-0.5">{dayWiseMetrics.newMaint}</span>
+                            <span className="text-lg font-bold text-slate-900 font-mono mt-0.5">{dayWiseMetrics.newMaint}</span>
                         </button>
 
                         {/* Active Updates Today */}
@@ -520,15 +522,15 @@ const TicketsPage: React.FC = () => {
                             onClick={() => setActivityFilter(prev => prev === 'active-today' ? 'all' : 'active-today')}
                             className={`flex flex-col text-left p-2.5 rounded-xl border transition-all ${
                                 activityFilter === 'active-today' 
-                                    ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-100' 
-                                    : 'bg-white border-gray-200 hover:border-emerald-200 hover:bg-emerald-50/30'
+                                    ? 'bg-emerald-50/90 border-emerald-400 ring-2 ring-emerald-100 shadow-2xs' 
+                                    : 'bg-white border-slate-200/90 hover:border-emerald-300 hover:bg-emerald-50/20'
                             }`}
                         >
-                            <span className="text-[11px] font-bold text-emerald-700 flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-emerald-700 flex items-center justify-between">
                                 <span>Active Today</span>
                                 <Zap size={12} className="text-emerald-500" />
                             </span>
-                            <span className="text-lg font-bold text-gray-900 mt-0.5">{dayWiseMetrics.activeToday}</span>
+                            <span className="text-lg font-bold text-slate-900 font-mono mt-0.5">{dayWiseMetrics.activeToday}</span>
                         </button>
 
                         {/* Needs Agent Action */}
@@ -536,18 +538,18 @@ const TicketsPage: React.FC = () => {
                             onClick={() => setActivityFilter(prev => prev === 'needs-action' ? 'all' : 'needs-action')}
                             className={`flex flex-col text-left p-2.5 rounded-xl border transition-all ${
                                 activityFilter === 'needs-action' 
-                                    ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-100' 
-                                    : 'bg-white border-gray-200 hover:border-rose-200 hover:bg-rose-50/30'
+                                    ? 'bg-rose-50/90 border-rose-400 ring-2 ring-rose-100 shadow-2xs' 
+                                    : 'bg-white border-slate-200/90 hover:border-rose-300 hover:bg-rose-50/20'
                             }`}
                         >
                             <span className="text-[11px] font-bold text-rose-600 flex items-center justify-between">
-                                <span className="flex items-center gap-1">
+                                <span className="flex items-center gap-1.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
                                     Needs Action
                                 </span>
                                 <AlertCircle size={12} className="text-rose-500" />
                             </span>
-                            <span className="text-lg font-bold text-rose-700 mt-0.5">{dayWiseMetrics.needsAction}</span>
+                            <span className="text-lg font-bold text-rose-700 font-mono mt-0.5">{dayWiseMetrics.needsAction}</span>
                         </button>
 
                         {/* Awaiting Response */}
@@ -555,15 +557,15 @@ const TicketsPage: React.FC = () => {
                             onClick={() => setActivityFilter(prev => prev === 'awaiting-response' ? 'all' : 'awaiting-response')}
                             className={`flex flex-col text-left p-2.5 rounded-xl border transition-all ${
                                 activityFilter === 'awaiting-response' 
-                                    ? 'bg-purple-50 border-purple-400 ring-2 ring-purple-100' 
-                                    : 'bg-white border-gray-200 hover:border-purple-200 hover:bg-purple-50/30'
+                                    ? 'bg-violet-50/90 border-violet-400 ring-2 ring-violet-100 shadow-2xs' 
+                                    : 'bg-white border-slate-200/90 hover:border-violet-300 hover:bg-violet-50/20'
                             }`}
                         >
-                            <span className="text-[11px] font-bold text-purple-700 flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-violet-700 flex items-center justify-between">
                                 <span>Awaiting Reply</span>
-                                <Clock size={12} className="text-purple-500" />
+                                <Clock size={12} className="text-violet-500" />
                             </span>
-                            <span className="text-lg font-bold text-gray-900 mt-0.5">{dayWiseMetrics.awaitingResp}</span>
+                            <span className="text-lg font-bold text-slate-900 font-mono mt-0.5">{dayWiseMetrics.awaitingResp}</span>
                         </button>
 
                         {/* Carried Forward */}
@@ -571,15 +573,15 @@ const TicketsPage: React.FC = () => {
                             onClick={() => setActivityFilter(prev => prev === 'carried-forward' ? 'all' : 'carried-forward')}
                             className={`flex flex-col text-left p-2.5 rounded-xl border transition-all ${
                                 activityFilter === 'carried-forward' 
-                                    ? 'bg-slate-100 border-slate-400 ring-2 ring-slate-100' 
-                                    : 'bg-white border-gray-200 hover:border-slate-300 hover:bg-slate-50'
+                                    ? 'bg-slate-100 border-slate-400 ring-2 ring-slate-200 shadow-2xs' 
+                                    : 'bg-white border-slate-200/90 hover:border-slate-300 hover:bg-slate-50'
                             }`}
                         >
-                            <span className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-slate-700 flex items-center justify-between">
                                 <span>Carry Forward</span>
                                 <FolderSync size={12} className="text-slate-500" />
                             </span>
-                            <span className="text-lg font-bold text-gray-900 mt-0.5">{dayWiseMetrics.carriedForward}</span>
+                            <span className="text-lg font-bold text-slate-900 font-mono mt-0.5">{dayWiseMetrics.carriedForward}</span>
                         </button>
 
                         {/* Resolved Today */}
@@ -592,15 +594,15 @@ const TicketsPage: React.FC = () => {
                             }}
                             className={`flex flex-col text-left p-2.5 rounded-xl border transition-all ${
                                 activityFilter === 'resolved-today' 
-                                    ? 'bg-teal-50 border-teal-400 ring-2 ring-teal-100' 
-                                    : 'bg-white border-gray-200 hover:border-teal-200 hover:bg-teal-50/30'
+                                    ? 'bg-teal-50/90 border-teal-400 ring-2 ring-teal-100 shadow-2xs' 
+                                    : 'bg-white border-slate-200/90 hover:border-teal-300 hover:bg-teal-50/20'
                             }`}
                         >
-                            <span className="text-[11px] font-bold text-teal-700 flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-teal-700 flex items-center justify-between">
                                 <span>Resolved Today</span>
                                 <CheckCircle2 size={12} className="text-teal-500" />
                             </span>
-                            <span className="text-lg font-bold text-gray-900 mt-0.5">{dayWiseMetrics.resolvedToday}</span>
+                            <span className="text-lg font-bold text-slate-900 font-mono mt-0.5">{dayWiseMetrics.resolvedToday}</span>
                         </button>
                     </div>
                 </div>
@@ -659,7 +661,7 @@ const TicketsPage: React.FC = () => {
                                         <div className="h-px bg-gray-200 flex-1 ml-2" />
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
                                         {group.items.map(ticket => {
                                             const meta = getTicketMeta(ticket);
                                             return (
@@ -668,7 +670,7 @@ const TicketsPage: React.FC = () => {
                                                     name={ticket.name}
                                                     ticketId={ticket.ticketId}
                                                     email={ticket.email}
-                                                    header={ticket.circuitId || ticket.header}
+                                                    header={ticket.header || ticket.circuitId || 'No Subject'}
                                                     date={ticket.createdAt || ticket.date}
                                                     priority={ticket.priority || localStorage.getItem(`confirmed_priority_${ticket.id}`) || undefined}
                                                     ticketType={ticket.ticketType}
@@ -690,7 +692,7 @@ const TicketsPage: React.FC = () => {
                             ))}
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
                             {filteredTickets.map(ticket => {
                                 const meta = getTicketMeta(ticket);
                                 return (
@@ -699,7 +701,7 @@ const TicketsPage: React.FC = () => {
                                         name={ticket.name}
                                         ticketId={ticket.ticketId}
                                         email={ticket.email}
-                                        header={ticket.circuitId || ticket.header}
+                                        header={ticket.header || ticket.circuitId || 'No Subject'}
                                         date={ticket.createdAt || ticket.date}
                                         priority={ticket.priority || localStorage.getItem(`confirmed_priority_${ticket.id}`) || undefined}
                                         ticketType={ticket.ticketType}
