@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, NavLink } from 'react-router-dom';
 import {
     PieChart,
@@ -8,7 +8,6 @@ import {
     UserPlus,
     FileText,
     ChevronLeft,
-    ChevronRight,
     MoreVertical,
     LogOut,
     X,
@@ -30,12 +29,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ agentName, isMobileOpen, onClo
     const [showMenu, setShowMenu] = useState(false);
     const [showAccountModal, setShowAccountModal] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const { isSuperAdmin, isManager, logout, user } = useAuth();
     
     const agentId = user?.id;
     const { avatarUrl } = useAvatar(agentId);
+
+    // Close menu on click outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowMenu(false);
+            }
+        };
+        if (showMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showMenu]);
 
     const allMenuItems = [
         { icon: PieChart, label: 'Dashboard', path: 'overview' },
@@ -69,22 +84,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ agentName, isMobileOpen, onClo
         <>
             {/* Mobile Overlay */}
             <div
-                className={`fixed inset-0 bg-black/50 z-[40] lg:hidden transition-opacity duration-300 print:hidden ${isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                className={`fixed inset-0 bg-black/40 backdrop-blur-xs z-[40] lg:hidden transition-opacity duration-300 print:hidden ${
+                    isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                }`}
                 onClick={onClose}
             />
 
             <div
-                className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-100 flex flex-col transition-[width,transform] duration-300 ease-in-out lg:relative lg:z-30 h-screen will-change-[width] print:hidden ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-                    } ${isCollapsed ? 'lg:w-20' : 'lg:w-72'} w-72`}
+                className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200/70 shadow-[1px_0_12px_rgba(0,0,0,0.02)] flex flex-col transition-[width,transform] duration-300 ease-in-out lg:relative lg:z-30 h-screen will-change-[width] print:hidden ${
+                    isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+                } ${isCollapsed ? 'lg:w-20' : 'lg:w-72'} w-72`}
             >
                 {/* Mobile Close Button */}
                 <button
                     onClick={onClose}
-                    className="absolute right-4 top-4 p-2 text-gray-400 lg:hidden hover:text-brand-red transition-colors"
+                    className="absolute right-4 top-4 p-2 text-slate-400 lg:hidden hover:text-brand-red hover:bg-slate-50 rounded-lg transition-colors"
+                    aria-label="Close menu"
                 >
-                    <X size={24} />
+                    <X size={20} />
                 </button>
 
+                {/* Logo Area (Preserved exactly as requested) */}
                 <div className={`p-4 h-[110px] flex items-center justify-center overflow-hidden transition-[padding] duration-300 ${isCollapsed ? 'lg:px-2' : 'px-4'}`}>
                     <img
                         src="/assets/logo.png"
@@ -93,110 +113,186 @@ export const Sidebar: React.FC<SidebarProps> = ({ agentName, isMobileOpen, onClo
                     />
                 </div>
 
-                {/* Collapse Button (Desktop Only) */}
+                {/* Refined Desktop Collapse Toggle Button */}
                 <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
-                    className={`absolute -right-4 top-11 w-8 h-8 hidden lg:flex items-center justify-center transition-all z-50 shadow-lg rounded-full border-2 border-white group hover:scale-110 active:scale-95 ${isCollapsed
-                        ? 'bg-brand-red text-white shadow-red-200'
-                        : 'bg-white text-gray-400 hover:text-brand-red hover:bg-gray-50 shadow-gray-200'
-                        }`}
-                    title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                    className="absolute -right-3.5 top-10 w-7 h-7 hidden lg:flex items-center justify-center z-50 rounded-full bg-white border border-slate-200/90 shadow-xs hover:shadow-md text-slate-400 hover:text-brand-red hover:border-slate-300 transition-all duration-200 active:scale-95 group"
+                    title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                 >
-                    {isCollapsed ? (
-                        <ChevronRight size={18} strokeWidth={3} />
-                    ) : (
-                        <ChevronLeft size={18} strokeWidth={3} />
-                    )}
+                    <ChevronLeft
+                        size={15}
+                        strokeWidth={2.4}
+                        className={`transition-transform duration-300 ease-in-out ${
+                            isCollapsed ? 'rotate-180 text-brand-red' : 'rotate-0'
+                        }`}
+                    />
                 </button>
 
-                {/* Navigation */}
-                <nav className={`flex-1 py-6 space-y-1.5 overflow-hidden transition-all duration-300 ${isCollapsed ? 'px-2' : 'px-4'}`}>
+                {/* Navigation Links */}
+                <nav className={`flex-1 py-4 space-y-1 transition-all duration-300 ${isCollapsed ? 'px-2 overflow-visible' : 'px-3 overflow-y-auto overflow-x-hidden'}`}>
                     {menuItems.map((item, idx) => (
                         <NavLink
                             key={idx}
                             to={`/dashboard/${id}/${item.path}`}
                             onClick={() => onClose?.()}
                             className={({ isActive }) =>
-                                `flex items-center rounded-lg transition-all group whitespace-nowrap py-3 ${isCollapsed ? 'justify-center px-0' : 'gap-4 px-4'
-                                } ${isActive
-                                    ? 'bg-brand-red text-white shadow-sm'
-                                    : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+                                `relative flex items-center rounded-xl transition-all duration-200 group whitespace-nowrap ${
+                                    isCollapsed
+                                        ? 'justify-center w-11 h-11 mx-auto'
+                                        : 'gap-3 px-3.5 py-2.5'
+                                } ${
+                                    isActive
+                                        ? 'bg-red-50/90 text-brand-red font-semibold shadow-xs'
+                                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50/80 font-medium'
                                 }`
                             }
                         >
                             {({ isActive }) => (
                                 <>
-                                    <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} className={`flex-shrink-0 ${isActive ? '' : 'text-gray-400 group-hover:text-gray-500 transition-colors'}`} />
-                                    <div className={`transition-all duration-300 overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-40 opacity-100'}`}>
-                                        <span className="font-semibold text-[15px] whitespace-nowrap">{item.label}</span>
+                                    {/* Active Left Accent Indicator (Expanded Mode) */}
+                                    {isActive && !isCollapsed && (
+                                        <span className="absolute left-1 top-2.5 bottom-2.5 w-1 bg-brand-red rounded-full" />
+                                    )}
+
+                                    <item.icon
+                                        size={20}
+                                        strokeWidth={isActive ? 2.3 : 1.9}
+                                        className={`flex-shrink-0 transition-colors duration-150 ${
+                                            isActive
+                                                ? 'text-brand-red'
+                                                : 'text-slate-400 group-hover:text-slate-700'
+                                        }`}
+                                    />
+
+                                    {/* Label Container */}
+                                    <div
+                                        className={`transition-all duration-300 overflow-hidden ${
+                                            isCollapsed ? 'w-0 opacity-0' : 'w-44 opacity-100'
+                                        }`}
+                                    >
+                                        <span className="text-[14px] whitespace-nowrap tracking-tight transition-transform duration-150 group-hover:translate-x-0.5 inline-block">
+                                            {item.label}
+                                        </span>
                                     </div>
+
+                                    {/* Collapsed Mode Floating Tooltip */}
+                                    {isCollapsed && (
+                                        <div className="absolute left-[calc(100%+14px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg shadow-xl opacity-0 -translate-x-1 pointer-events-none group-hover:opacity-100 group-hover:translate-x-0 group-hover:pointer-events-auto transition-all duration-150 whitespace-nowrap z-[100] border border-slate-800 flex items-center drop-shadow-md">
+                                            <span>{item.label}</span>
+                                            {/* Caret */}
+                                            <div className="absolute right-full top-1/2 -translate-y-1/2 border-y-4 border-y-transparent border-r-4 border-r-slate-900" />
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </NavLink>
                     ))}
                 </nav>
 
-                {/* Footer / Profile */}
-                <div className={`border-t border-gray-100 relative transition-all duration-300 ${isCollapsed ? 'p-2' : 'p-4'}`}>
-                    <div className={`flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors ${isCollapsed ? 'flex-col' : ''}`}>
-                        <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700 font-bold flex-shrink-0 text-sm overflow-hidden">
-                                {avatarUrl ? (
-                                    <img src={avatarUrl} alt={agentName} className="w-full h-full object-cover" />
-                                ) : (
-                                    agentName.charAt(0)
-                                )}
-                            </div>
-                            <div className={`transition-all duration-300 overflow-hidden ${isCollapsed ? 'w-0 opacity-0' : 'w-40 opacity-100'}`}>
-                                <span className="text-[14px] font-bold text-gray-900 truncate block uppercase tracking-tight whitespace-nowrap">
-                                    {agentName}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="relative">
-                            {!isCollapsed && (
-                                <button
-                                    onClick={() => setShowMenu(!showMenu)}
-                                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                                >
-                                    <MoreVertical size={20} />
-                                </button>
-                            )}
-
-                            {showMenu && !isCollapsed && (
-                                <div
-                                    className="absolute bottom-full right-0 mb-3 bg-white border border-gray-100 rounded-lg shadow-xl py-2 min-w-[150px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-200"
-                                >
-                                    <button
-                                        onClick={() => { setShowMenu(false); setShowAccountModal(true); }}
-                                        className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50 text-sm font-bold transition-colors"
-                                    >
-                                        <UserIcon size={16} />
-                                        My Account
-                                    </button>
-                                    <div className="h-px bg-gray-100 my-1 mx-2"></div>
-                                    <button
-                                        onClick={handleLogoutTrigger}
-                                        className="w-full flex items-center gap-3 px-4 py-2 text-brand-red hover:bg-red-50 text-sm font-bold transition-colors"
-                                    >
-                                        <LogOut size={16} />
-                                        Log out
-                                    </button>
+                {/* Footer / Profile Section */}
+                <div className={`border-t border-slate-100 relative transition-all duration-300 ${isCollapsed ? 'p-2' : 'p-3'}`}>
+                    {isCollapsed ? (
+                        /* Collapsed Footer: Avatar + Logout with clean tooltips */
+                        <div className="flex flex-col items-center gap-2">
+                            {/* Avatar with account tooltip */}
+                            <div 
+                                className="relative group cursor-pointer"
+                                onClick={() => setShowAccountModal(true)}
+                            >
+                                <div className="relative w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-700 font-bold text-sm overflow-hidden hover:ring-2 hover:ring-brand-red/30 transition-all">
+                                    {avatarUrl ? (
+                                        <img src={avatarUrl} alt={agentName} className="w-full h-full object-cover" />
+                                    ) : (
+                                        agentName.charAt(0)
+                                    )}
+                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
                                 </div>
-                            )}
+                                <div className="absolute left-[calc(100%+14px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg shadow-xl opacity-0 -translate-x-1 pointer-events-none group-hover:opacity-100 group-hover:translate-x-0 group-hover:pointer-events-auto transition-all duration-150 whitespace-nowrap z-[100] border border-slate-800 flex items-center drop-shadow-md">
+                                    <span>{agentName}</span>
+                                    <div className="absolute right-full top-1/2 -translate-y-1/2 border-y-4 border-y-transparent border-r-4 border-r-slate-900" />
+                                </div>
+                            </div>
 
-                            {isCollapsed && (
+                            {/* Logout Button with tooltip */}
+                            <div className="relative group">
                                 <button
                                     onClick={handleLogoutTrigger}
-                                    className="p-2 text-gray-400 hover:text-brand-red transition-colors"
-                                    title="Logout"
+                                    className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-brand-red hover:bg-red-50/80 transition-colors"
+                                    aria-label="Log out"
                                 >
-                                    <LogOut size={20} />
+                                    <LogOut size={18} />
                                 </button>
-                            )}
+                                <div className="absolute left-[calc(100%+14px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg shadow-xl opacity-0 -translate-x-1 pointer-events-none group-hover:opacity-100 group-hover:translate-x-0 group-hover:pointer-events-auto transition-all duration-150 whitespace-nowrap z-[100] border border-slate-800 flex items-center drop-shadow-md">
+                                    <span>Log out</span>
+                                    <div className="absolute right-full top-1/2 -translate-y-1/2 border-y-4 border-y-transparent border-r-4 border-r-slate-900" />
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        /* Expanded Footer: Enclosed Profile Card */
+                        <div className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-50/70 hover:bg-slate-100/70 border border-slate-200/60 transition-all duration-150">
+                            <div 
+                                onClick={() => setShowAccountModal(true)}
+                                className="flex items-center gap-2.5 overflow-hidden cursor-pointer flex-1 min-w-0 group/user"
+                                title="View Account"
+                            >
+                                <div className="relative w-9 h-9 rounded-lg bg-white border border-slate-200/80 shadow-2xs flex items-center justify-center text-slate-700 font-bold flex-shrink-0 text-sm overflow-hidden group-hover/user:border-brand-red/40 transition-colors">
+                                    {avatarUrl ? (
+                                        <img src={avatarUrl} alt={agentName} className="w-full h-full object-cover" />
+                                    ) : (
+                                        agentName.charAt(0)
+                                    )}
+                                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
+                                </div>
+                                <div className="overflow-hidden min-w-0 flex-1">
+                                    <span className="text-[13.5px] font-bold text-slate-800 truncate block tracking-tight group-hover/user:text-brand-red transition-colors">
+                                        {agentName}
+                                    </span>
+                                    <span className="text-[11px] font-medium text-slate-400 truncate block capitalize">
+                                        {user?.role || 'Support Agent'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="relative" ref={menuRef}>
+                                <button
+                                    onClick={() => setShowMenu(!showMenu)}
+                                    className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-white transition-all ${
+                                        showMenu ? 'bg-white text-slate-700 shadow-xs' : ''
+                                    }`}
+                                    aria-label="Account menu"
+                                >
+                                    <MoreVertical size={17} />
+                                </button>
+
+                                {showMenu && (
+                                    <div
+                                        className="absolute bottom-full right-0 mb-2.5 bg-white border border-slate-200/90 rounded-xl shadow-xl py-1.5 min-w-[170px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                                    >
+                                        <div className="px-3.5 py-2 border-b border-slate-100 mb-1">
+                                            <p className="text-xs font-bold text-slate-900 truncate">{agentName}</p>
+                                            <p className="text-[11px] text-slate-400 truncate capitalize">{user?.role || 'Support Agent'}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => { setShowMenu(false); setShowAccountModal(true); }}
+                                            className="w-[calc(100%-8px)] mx-1 flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-lg transition-colors"
+                                        >
+                                            <UserIcon size={15} className="text-slate-400" />
+                                            My Account
+                                        </button>
+                                        <div className="h-px bg-slate-100 my-1 mx-2"></div>
+                                        <button
+                                            onClick={handleLogoutTrigger}
+                                            className="w-[calc(100%-8px)] mx-1 flex items-center gap-2.5 px-3 py-2 text-brand-red hover:bg-red-50/80 text-xs font-semibold rounded-lg transition-colors"
+                                        >
+                                            <LogOut size={15} />
+                                            Log out
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

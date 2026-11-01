@@ -273,9 +273,8 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
 
             {/* Centered Floating Window Container */}
             <div
-                className={`relative z-10 bg-white rounded-2xl shadow-2xl shadow-slate-950/25 border border-slate-200/90 flex flex-col w-full overflow-hidden transition-all duration-300 ease-out animate-float-out ${
-                    isExpanded ? 'max-w-6xl h-[92vh]' : 'max-w-4xl h-[86vh] max-h-[820px]'
-                }`}
+                className={`relative z-10 bg-white rounded-2xl shadow-2xl shadow-slate-950/25 border border-slate-200/90 flex flex-col w-full overflow-hidden transition-all duration-300 ease-out animate-float-out ${isExpanded ? 'max-w-6xl h-[92vh]' : 'max-w-4xl h-[86vh] max-h-[820px]'
+                    }`}
             >
                 {/* Top Header */}
                 <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between shrink-0">
@@ -306,11 +305,10 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
                         {/* View Switcher Button */}
                         <button
                             onClick={() => setViewMode(viewMode === 'editor' ? 'history' : 'editor')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                                viewMode === 'history'
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${viewMode === 'history'
                                     ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-800'
                                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 shadow-xs'
-                            }`}
+                                }`}
                             title="Toggle between Handover Editor and History Logs"
                         >
                             <History size={14} />
@@ -377,11 +375,10 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
                             {/* Today Shortcut Button */}
                             <button
                                 onClick={() => handleDateShiftChange(realTimeShift.current.date, realTimeShift.current.shift)}
-                                className={`text-xs px-3 py-1.5 rounded-xl font-semibold border transition-all ${
-                                    selectedDate === realTimeShift.current.date
+                                className={`text-xs px-3 py-1.5 rounded-xl font-semibold border transition-all ${selectedDate === realTimeShift.current.date
                                         ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
                                         : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                                }`}
+                                    }`}
                             >
                                 Today (Current Shift)
                             </button>
@@ -423,11 +420,10 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
                                         <button
                                             key={shiftKey}
                                             onClick={() => handleDateShiftChange(selectedDate, shiftKey)}
-                                            className={`flex flex-col p-3 rounded-xl border text-left transition-all relative ${
-                                                isSelected
+                                            className={`flex flex-col p-3 rounded-xl border text-left transition-all relative ${isSelected
                                                     ? 'bg-white border-slate-900 shadow-sm ring-2 ring-slate-900/10'
                                                     : 'bg-white/70 border-slate-200 hover:bg-white hover:border-slate-300'
-                                            }`}
+                                                }`}
                                         >
                                             <div className="flex items-center justify-between mb-1">
                                                 <div className="flex items-center gap-2">
@@ -464,13 +460,12 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
                                     {formatDateDisplay(selectedDate)} – Shift {selectedShift} ({currentConfig.name})
                                 </span>
                                 <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                        status === 'ACKNOWLEDGED'
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${status === 'ACKNOWLEDGED'
                                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                             : status === 'SUBMITTED'
-                                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                    }`}
+                                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                        }`}
                                 >
                                     {status}
                                 </span>
@@ -537,9 +532,9 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
                                         Acknowledged by <strong className="font-semibold">{currentData.incomingAgent}</strong> at{' '}
                                         {currentData.acknowledgedAt
                                             ? new Date(currentData.acknowledgedAt).toLocaleTimeString([], {
-                                                  hour: '2-digit',
-                                                  minute: '2-digit'
-                                              })
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })
                                             : ''}
                                     </span>
                                 )}
@@ -596,11 +591,10 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
                                     <button
                                         key={s}
                                         onClick={() => setHistoryShiftFilter(s)}
-                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                                            historyShiftFilter === s
+                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${historyShiftFilter === s
                                                 ? 'bg-white text-slate-900 shadow-xs'
                                                 : 'text-slate-600 hover:text-slate-900'
-                                        }`}
+                                            }`}
                                     >
                                         {s ? `Shift ${s}` : 'All Shifts'}
                                     </button>
@@ -681,13 +675,12 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
                                                                     {group.displayDate} – Shift {shiftKey} ({cfg.name})
                                                                 </span>
                                                                 <span
-                                                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                                                                        record.status === 'ACKNOWLEDGED'
+                                                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${record.status === 'ACKNOWLEDGED'
                                                                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                                                             : record.status === 'SUBMITTED'
-                                                                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                                                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                                                    }`}
+                                                                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                        }`}
                                                                 >
                                                                     {record.status}
                                                                 </span>
@@ -696,9 +689,9 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
                                                             <div className="text-[11px] text-slate-400">
                                                                 {record.updatedAt
                                                                     ? new Date(record.updatedAt).toLocaleTimeString([], {
-                                                                          hour: '2-digit',
-                                                                          minute: '2-digit'
-                                                                      })
+                                                                        hour: '2-digit',
+                                                                        minute: '2-digit'
+                                                                    })
                                                                     : ''}
                                                             </div>
                                                         </div>
