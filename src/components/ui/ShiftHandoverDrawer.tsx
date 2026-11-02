@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
     FileText,
     X,
@@ -263,8 +264,8 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
 
     const previousShiftInfo = getPreviousShift(selectedDate, selectedShift);
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 overflow-hidden">
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 md:p-6 overflow-hidden">
             {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity duration-300 animate-in fade-in"
@@ -720,7 +721,8 @@ export const ShiftHandoverDrawer: React.FC<ShiftHandoverDrawerProps> = ({
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 export default ShiftHandoverDrawer;

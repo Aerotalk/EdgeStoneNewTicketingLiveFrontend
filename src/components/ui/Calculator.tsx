@@ -84,7 +84,7 @@ export const Calculator: React.FC<CalculatorProps> = ({
     const finalShowFloatingButton = showFloatingButton ?? !isControlled;
 
     return (
-        <div className={`fixed right-6 z-50 flex flex-col items-end ${finalShowFloatingButton ? 'bottom-6 right-[5.5rem]' : 'bottom-24'}`}>
+        <div className={`fixed right-6 z-[9990] flex flex-col items-end ${finalShowFloatingButton ? 'bottom-6 right-[5.5rem]' : 'bottom-24'}`}>
             {isOpen && (
                 <div className={`${finalShowFloatingButton ? 'mb-4' : ''} w-[320px] bg-gray-900 rounded-3xl shadow-2xl border border-gray-800 overflow-hidden flex flex-col transition-all duration-300 transform origin-bottom-right animate-in slide-in-from-bottom-2 fade-in`}>
                     {/* Header */}

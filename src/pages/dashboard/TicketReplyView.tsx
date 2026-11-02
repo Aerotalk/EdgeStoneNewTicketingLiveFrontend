@@ -1639,7 +1639,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
     return (
         <div className="flex flex-col h-full bg-white relative font-sans">
             {/* Header Area */}
-            <div className="flex flex-col border-b border-gray-100 w-full relative z-[60]">
+            <div className="flex flex-col border-b border-gray-100 w-full relative z-20">
                 <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between px-4 sm:px-6 py-4 gap-4 w-full">
                     <div className="flex items-center gap-2 sm:gap-4 text-[16px] sm:text-[18px] text-gray-500 font-medium flex-1 min-w-0 w-full pr-0 xl:pr-4">
                         <button
