@@ -611,10 +611,13 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 return candSub.toLowerCase().includes(customerId.trim().toLowerCase());
             };
 
-            // 1. Check if any vendor-thread reply (from vendor or agent) has a valid subject that does NOT leak customerCircuitId
+            // 1. Check if any vendor reply (or agent reply in this vendor tab) has a valid subject that does NOT leak customerCircuitId
             const latestVendorReplyWithSubject = [...vendorReplies]
                 .reverse()
-                .find(r => r.subject && r.subject.trim() && r.subject !== 'null' && !leaksCustomerCircuit(r.subject) && (r.type === 'vendor' || r.author?.toLowerCase().includes('vendor') || r.author?.toLowerCase().includes('aerovendor')));
+                .find(r => r.subject && r.subject.trim() && r.subject !== 'null' && !leaksCustomerCircuit(r.subject) && (r.type === 'vendor' || r.author?.toLowerCase().includes('vendor') || r.author?.toLowerCase().includes('aerovendor')))
+                || [...vendorReplies]
+                    .reverse()
+                    .find(r => r.subject && r.subject.trim() && r.subject !== 'null' && !leaksCustomerCircuit(r.subject));
 
             // 2. Determine vendor-provided subject (Vendor-provided subject is PRIMARY for maintenance & vendor tickets)
             let vendorProvidedSubject = '';
@@ -1219,7 +1222,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         };
     }, [activeTab, ticket.email, ticket.header, ticket.id, confirmedCircuit, ticket.circuitId, ticket.cc, replies, ticketCircuit]);
 
-    // Ensure subject line is locked and populated when opening the email modal
+    // Ensure subject line is locked and populated when opening the email modal or when circuit details finish loading
     useEffect(() => {
         if (showEmailModal) {
             setEmailForm(prev => ({
@@ -1227,7 +1230,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 subject: getLockedSubject(activeTab)
             }));
         }
-    }, [showEmailModal, activeTab, replies, ticket.id, ticket.ticketId, confirmedCircuit, ticket.circuitId]);
+    }, [showEmailModal, activeTab, replies, ticket.id, ticket.ticketId, confirmedCircuit, ticket.circuitId, ticketCircuit]);
 
     // Fetch dynamic circuits depending on current ticket vendor context
     useEffect(() => {
