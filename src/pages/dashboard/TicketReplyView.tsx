@@ -552,10 +552,29 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         return reply.category === tab;
     };
 
+    const sanitizeSubjectLine = (subj: string): string => {
+        if (!subj) return '';
+        const escapedId = (ticket.ticketId || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let s = subj
+            .replace(/\|\s*me\s*reply\s*\|/gi, '||')
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (escapedId) {
+            // Collapse duplicate EdgeStone ticket tags e.g. "[#1157-V] [#1157-V]" or "[#1082-V] RE：[#1082-V]"
+            s = s.replace(new RegExp(`(\\[${escapedId}(?:-V)?\\])(?:\\s*(?:(?:re|fwd|fw|回复|答复|转发)[：:\\s]+)*\\s*\\[${escapedId}(?:-V)?\\])+`, 'gi'), '$1');
+            // Strip redundant Re:/RE： immediately after EdgeStone ticket tag e.g. "[#1082-V] RE：Link..." -> "[#1082-V] Link..."
+            s = s.replace(new RegExp(`(\\[${escapedId}(?:-V)?\\]\\s*)(?:(?:re|fwd|fw|回复|答复|转发)[：:\\s]+)+`, 'gi'), '$1');
+        }
+        return s.replace(/^(?:(?:re|fwd|fw|回复|答复|转发)[：:\s]+)+/gi, 'Re: ').trim();
+    };
+
     const getCleanSubject = (subj: string): string => {
         if (!subj) return '';
-        let clean = subj.replace(/^(Re|Fwd|FW|RE|FWD):\s*/gi, '').trim();
-        clean = clean.replace(/^\[#?[A-Za-z0-9_-]+?(?:-V)?\]\s*/i, '').trim();
+        let clean = sanitizeSubjectLine(subj);
+        // Strip leading Re:/RE：/Fwd: prefixes
+        clean = clean.replace(/^(?:(?:re|fwd|fw|回复|答复|转发)[：:\s]+)+/gi, '').trim();
+        // Only strip EdgeStone's own [#1234] / [#V1234] / [#1234-V] tag (NEVER strip vendor tags like [M00000-1547]!)
+        clean = clean.replace(/^(?:\[#?(?:V?\d+|TEST-[A-Za-z0-9_-]+)(?:-V)?\]\s*(?:(?:re|fwd|fw|回复|答复|转发)[：:\s]+)*)+/gi, '').trim();
         return clean;
     };
 
@@ -568,7 +587,7 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
             // 1. Check if any vendor reply in the thread has a subject
             const latestVendorReplyWithSubject = [...vendorReplies]
                 .reverse()
-                .find(r => r.subject && r.subject.trim() && (r.type === 'vendor' || r.author?.toLowerCase().includes('vendor') || r.author?.toLowerCase().includes('aerovendor')));
+                .find(r => r.subject && r.subject.trim() && r.subject !== 'null' && (r.type === 'vendor' || r.author?.toLowerCase().includes('vendor') || r.author?.toLowerCase().includes('aerovendor')));
 
             // 2. Identify if this is a Maintenance ticket or Vendor-originated ticket
             const isMaintenanceTicket = ticket.isMaintenance || ticket.status?.toLowerCase() === 'maintenance';
@@ -582,20 +601,25 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 vendorProvidedSubject = ticket.header;
             }
 
-            // 4. If a valid localSub exists in localStorage from this conversation, check if it's usable.
-            // Discard any contaminated localSub that has "Issue regarding Circuit" when a vendor-provided subject exists!
-            const localSub = localStorage.getItem(`vendor_subject_${ticket.id}_${tab}`);
-            if (localSub && localSub.includes(ticket.ticketId)) {
-                const isContaminatedIssueSubject = localSub.includes('Issue regarding Circuit');
-                if (!vendorProvidedSubject || !isContaminatedIssueSubject) {
-                    return localSub;
+            // 4. If vendor provided a subject (primary for maintenance & vendor communication), preserve its thread topic for Outlook
+            if (vendorProvidedSubject) {
+                const sanitizedVendorSub = sanitizeSubjectLine(vendorProvidedSubject);
+                // If vendor's subject already includes our [#TicketId-V] tag (e.g. "RE: [M00000-1547][#1157-V] Issue regarding..."),
+                // keep the vendor's exact tag order (including [M00000-1547]) and NEVER prepend a duplicate [#1157-V]!
+                if (sanitizedVendorSub.toLowerCase().includes(ticket.ticketId.toLowerCase())) {
+                    const withoutLeadingRe = sanitizedVendorSub.replace(/^(?:(?:re|fwd|fw|回复|答复|转发)[：:\s]+)+/gi, '').trim();
+                    return `Re: ${withoutLeadingRe}`;
                 }
+                const cleanSubject = getCleanSubject(sanitizedVendorSub) || sanitizedVendorSub;
+                return `Re: [${ticket.ticketId}-V] ${cleanSubject}`;
             }
 
-            // 5. If vendor provided a subject (primary for maintenance & vendor communication), format and lock it
-            if (vendorProvidedSubject) {
-                const cleanSubject = getCleanSubject(vendorProvidedSubject) || vendorProvidedSubject;
-                return `Re: [${ticket.ticketId}-V] ${cleanSubject}`;
+            // 5. If a valid localSub exists in localStorage from this conversation, sanitize and use it
+            const rawLocalSub = localStorage.getItem(`vendor_subject_${ticket.id}_${tab}`);
+            if (rawLocalSub && rawLocalSub.includes(ticket.ticketId)) {
+                const cleanedLocal = sanitizeSubjectLine(rawLocalSub);
+                localStorage.setItem(`vendor_subject_${ticket.id}_${tab}`, cleanedLocal);
+                return cleanedLocal;
             }
 
             // 6. Fallback ONLY for client-originated tickets where vendor has never emailed (initial outreach to vendor):
@@ -611,10 +635,10 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
             if (supplierId) {
                 return `Re: [${ticket.ticketId}-V] Issue regarding Circuit ${supplierId}`;
             }
-            return `Re: [${ticket.ticketId}-V] ${ticket.header}`;
+            return `Re: [${ticket.ticketId}-V] ${getCleanSubject(ticket.header) || ticket.header}`;
         }
 
-        const cleanHeader = getCleanSubject(ticket.header) || ticket.header;
+        const cleanHeader = getCleanSubject(ticket.header) || sanitizeSubjectLine(ticket.header);
         return `Re: [${ticket.ticketId}] ${cleanHeader}`;
     };
 
