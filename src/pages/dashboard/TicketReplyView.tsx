@@ -554,11 +554,17 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
 
     const sanitizeSubjectLine = (subj: string): string => {
         if (!subj) return '';
+        const rawNum = (ticket.ticketId || '').replace(/^#?V?/i, '').trim();
+        const escapedNum = rawNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const escapedId = (ticket.ticketId || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         let s = subj
             .replace(/\|\s*me\s*reply\s*\|/gi, '||')
             .replace(/\s+/g, ' ')
             .trim();
+        if (escapedNum) {
+            // Normalize variant vendor tags with spaces or missing '#' e.g. "[1160 V]" or "[#1160 V]" -> "[#1160-V]"
+            s = s.replace(new RegExp(`\\[#?V?${escapedNum}[\\s-]+V\\]`, 'gi'), `[${ticket.ticketId}-V]`);
+        }
         if (escapedId) {
             // Collapse duplicate EdgeStone ticket tags e.g. "[#1157-V] [#1157-V]" or "[#1082-V] RE：[#1082-V]"
             s = s.replace(new RegExp(`(\\[${escapedId}(?:-V)?\\])(?:\\s*(?:(?:re|fwd|fw|回复|答复|转发)[：:\\s]+)*\\s*\\[${escapedId}(?:-V)?\\])+`, 'gi'), '$1');
@@ -573,8 +579,8 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
         let clean = sanitizeSubjectLine(subj);
         // Strip leading Re:/RE：/Fwd: prefixes
         clean = clean.replace(/^(?:(?:re|fwd|fw|回复|答复|转发)[：:\s]+)+/gi, '').trim();
-        // Only strip EdgeStone's own [#1234] / [#V1234] / [#1234-V] tag (NEVER strip vendor tags like [M00000-1547]!)
-        clean = clean.replace(/^(?:\[#?(?:V?\d+|TEST-[A-Za-z0-9_-]+)(?:-V)?\]\s*(?:(?:re|fwd|fw|回复|答复|转发)[：:\s]+)*)+/gi, '').trim();
+        // Only strip EdgeStone's own [#1234] / [#V1234] / [#1234-V] / [1234 V] tag (NEVER strip vendor tags like [M00000-1547]!)
+        clean = clean.replace(/^(?:\[#?(?:V?\d+|TEST-[A-Za-z0-9_-]+)(?:[-\s]+V)?\]\s*(?:(?:re|fwd|fw|回复|答复|转发)[：:\s]+)*)+/gi, '').trim();
         return clean;
     };
 
@@ -584,24 +590,41 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
             const isSpecificVendor = tab.startsWith('vendor_');
             const vendorReplies = replies.filter(r => r && (isSpecificVendor ? r.category === tab : (r.category === tab || r.category === 'vendor' || r.category?.startsWith('vendor_') || r.type === 'vendor')));
 
-            // 1. Check if any vendor reply in the thread has a subject
-            const latestVendorReplyWithSubject = [...vendorReplies]
-                .reverse()
-                .find(r => r.subject && r.subject.trim() && r.subject !== 'null' && (r.type === 'vendor' || r.author?.toLowerCase().includes('vendor') || r.author?.toLowerCase().includes('aerovendor')));
-
-            // 2. Identify if this is a Maintenance ticket or Vendor-originated ticket
+            // Identify if this is a Maintenance ticket or Vendor-originated ticket
             const isMaintenanceTicket = ticket.isMaintenance || ticket.status?.toLowerCase() === 'maintenance';
             const isVendorTicket = ticket.ticketType === 'Vendor' || ticket.ticketId?.includes('V');
 
-            // 3. Determine vendor-provided subject (Vendor-provided subject is PRIMARY for maintenance & vendor tickets)
+            // Resolve supplierCircuitId vs confidential customerCircuitId
+            let supplierId: string | null = null;
+            if (isSpecificVendor && ticketCircuit?.vendorCircuits) {
+                const currentVendorId = tab.replace('vendor_', '');
+                const vc = ticketCircuit.vendorCircuits.find((v: any) => v.vendorId === currentVendorId);
+                if (vc && vc.supplierCircuitId) supplierId = vc.supplierCircuitId;
+            }
+            if (!supplierId) {
+                supplierId = ticketCircuit?.supplierCircuitId || null;
+            }
+            const customerId = ticketCircuit?.customerCircuitId || (!isVendorTicket ? ticket.circuitId : null);
+            const leaksCustomerCircuit = (candSub?: string): boolean => {
+                if (!candSub || isMaintenanceTicket || isVendorTicket || !customerId) return false;
+                if (supplierId && customerId.trim().toLowerCase() === supplierId.trim().toLowerCase()) return false;
+                return candSub.toLowerCase().includes(customerId.trim().toLowerCase());
+            };
+
+            // 1. Check if any vendor-thread reply (from vendor or agent) has a valid subject that does NOT leak customerCircuitId
+            const latestVendorReplyWithSubject = [...vendorReplies]
+                .reverse()
+                .find(r => r.subject && r.subject.trim() && r.subject !== 'null' && !leaksCustomerCircuit(r.subject) && (r.type === 'vendor' || r.author?.toLowerCase().includes('vendor') || r.author?.toLowerCase().includes('aerovendor')));
+
+            // 2. Determine vendor-provided subject (Vendor-provided subject is PRIMARY for maintenance & vendor tickets)
             let vendorProvidedSubject = '';
             if (latestVendorReplyWithSubject?.subject) {
                 vendorProvidedSubject = latestVendorReplyWithSubject.subject;
-            } else if (isMaintenanceTicket || isVendorTicket || vendorReplies.some(r => r.type === 'vendor')) {
+            } else if (isMaintenanceTicket || isVendorTicket) {
                 vendorProvidedSubject = ticket.header;
             }
 
-            // 4. If vendor provided a subject (primary for maintenance & vendor communication), preserve its thread topic for Outlook
+            // 3. If vendor provided a subject (primary for maintenance & vendor communication), preserve its thread topic for Outlook
             if (vendorProvidedSubject) {
                 const sanitizedVendorSub = sanitizeSubjectLine(vendorProvidedSubject);
                 // If vendor's subject already includes our [#TicketId-V] tag (e.g. "RE: [M00000-1547][#1157-V] Issue regarding..."),
@@ -614,28 +637,24 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
                 return `Re: [${ticket.ticketId}-V] ${cleanSubject}`;
             }
 
-            // 5. If a valid localSub exists in localStorage from this conversation, sanitize and use it
+            // 4. If a valid localSub exists in localStorage from this conversation (and does not leak customer circuit ID), sanitize and use it
             const rawLocalSub = localStorage.getItem(`vendor_subject_${ticket.id}_${tab}`);
-            if (rawLocalSub && rawLocalSub.includes(ticket.ticketId)) {
+            if (rawLocalSub && rawLocalSub.includes(ticket.ticketId) && !leaksCustomerCircuit(rawLocalSub)) {
                 const cleanedLocal = sanitizeSubjectLine(rawLocalSub);
                 localStorage.setItem(`vendor_subject_${ticket.id}_${tab}`, cleanedLocal);
                 return cleanedLocal;
             }
 
-            // 6. Fallback ONLY for client-originated tickets where vendor has never emailed (initial outreach to vendor):
-            let supplierId: string | null = null;
-            if (isSpecificVendor && ticketCircuit?.vendorCircuits) {
-                const currentVendorId = tab.replace('vendor_', '');
-                const vc = ticketCircuit.vendorCircuits.find((v: any) => v.vendorId === currentVendorId);
-                if (vc && vc.supplierCircuitId) supplierId = vc.supplierCircuitId;
+            // 5. Fallback for client-originated tickets where vendor has never emailed (initial outreach to vendor):
+            // NEVER fall back to ticket.header or customerId on a client-originated ticket!
+            const safeSupplierId = supplierId || (isVendorTicket || isMaintenanceTicket ? (confirmedCircuit || ticket.circuitId) : null);
+            if (safeSupplierId) {
+                return `Re: [${ticket.ticketId}-V] Issue regarding Circuit ${safeSupplierId}`;
             }
-            if (!supplierId) {
-                supplierId = ticketCircuit?.supplierCircuitId || confirmedCircuit || ticket.circuitId;
+            if (isVendorTicket || isMaintenanceTicket) {
+                return `Re: [${ticket.ticketId}-V] ${getCleanSubject(ticket.header) || ticket.header}`;
             }
-            if (supplierId) {
-                return `Re: [${ticket.ticketId}-V] Issue regarding Circuit ${supplierId}`;
-            }
-            return `Re: [${ticket.ticketId}-V] ${getCleanSubject(ticket.header) || ticket.header}`;
+            return `Re: [${ticket.ticketId}-V] Issue regarding Vendor Circuit`;
         }
 
         const cleanHeader = getCleanSubject(ticket.header) || sanitizeSubjectLine(ticket.header);
