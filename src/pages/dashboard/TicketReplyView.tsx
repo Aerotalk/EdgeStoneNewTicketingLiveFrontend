@@ -1525,7 +1525,21 @@ export const TicketReplyView: React.FC<TicketReplyViewProps> = ({ ticket, onBack
 
         } catch (error: any) {
             console.error('Failed to send reply:', error);
-            toast.error(error?.message || 'Failed to send reply. Please try again.');
+            const rawMsg = String(error?.message || '');
+            const isTechnicalDump =
+                rawMsg.includes('prisma.') ||
+                rawMsg.includes('PrismaClient') ||
+                rawMsg.includes('Invalid `') ||
+                /\{\s*where:\s*\{/.test(rawMsg) ||
+                rawMsg.includes('TypeError') ||
+                rawMsg.includes('SyntaxError') ||
+                rawMsg.length > 220;
+
+            const friendlyMsg = isTechnicalDump
+                ? 'Safety mechanism active: Sending is temporarily restricted while verifying thread & client confidentiality. Please refresh and try again.'
+                : (rawMsg || 'Failed to send reply. Please try again.');
+
+            toast.error(friendlyMsg, { duration: 5000 });
         } finally {
             setIsSending(false);
         }
